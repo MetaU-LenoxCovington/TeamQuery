@@ -1,0 +1,196 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// USER AND AUTH
+model User {
+  id             String        @id @default(uuid())
+  email          String        @unique
+  name           String?
+  passwordHash   String?       // null if using SSO only
+  orgUsers       OrgUser[]
+  createdAt      DateTime      @default(now())
+}
+
+model OrgUser {
+  id               String         @id @default(uuid())
+  user             User           @relation(fields: [userId], references: [id])
+  userId           String
+  organization     Organization   @relation(fields: [organizationId], references: [id])
+  organizationId   String
+  role             Role           @relation(fields: [roleId], references: [id])
+  roleId           String
+  status           OrgUserStatus  @default(ACTIVE)
+  // e.g., array of property/building IDs user is assigned to manage
+  assignedProperties String[]     // property IDs/names/labels relevant to the org
+  joinedAt         DateTime       @default(now())
+  workflows        Workflow[]
+  properties       Property[]     @relation("PropertyManagers")
+  documents        Document[]
+}
+
+enum OrgUserStatus {
+  ACTIVE
+  INVITED
+  DISABLED
+}
+
+// ORGANIZATION & ROLES
+model Organization {
+  id          String      @id @default(uuid())
+  name        String
+  orgUsers    OrgUser[]
+  roles       Role[]
+  documents   Document[]
+  folders     Folder[]
+  properties  Property[]
+  workflows   Workflow[]
+  createdAt   DateTime    @default(now())
+}
+
+model Role {
+  id             String          @id @default(uuid())
+  name           String
+  organization   Organization    @relation(fields: [organizationId], references: [id])
+  organizationId String
+  permissions    RolePermission[]
+  // If this role is above others, specify a precedence (lower = more powerful)
+  precedence     Int             @default(100)
+  description    String?
+  orgUsers       OrgUser[]
+  folders        Folder[]        @relation("FolderRoles")
+  documents      Document[]      @relation("DocumentRoles")
+}
+
+model RolePermission {
+  id           String    @id @default(uuid())
+  role         Role      @relation(fields: [roleId], references: [id])
+  roleId       String
+  actions       String[]    // e.g. "upload", "view", "delete", "manage_users", "share", "configure_access"
+  resources     String[]    // "document", "folder", "workflow", or more granular ("property:<id>")
+  constraint   String?   // optional, e.g., "only-own"
+}
+
+// DOCUMENT/FOLDER/PROPERTY STRUCTURE
+model Folder {
+  id             String         @id @default(uuid())
+  organization   Organization   @relation(fields: [organizationId], references: [id])
+  organizationId String
+  name           String
+  parentFolder   Folder?        @relation("FolderToFolder", fields: [parentId], references: [id])
+  parentId       String?
+  subFolders     Folder[]       @relation("FolderToFolder")
+  documents      Document[]
+  accessRoles    Role[]         @relation("FolderRoles")
+  createdAt      DateTime       @default(now())
+}
+
+model Document {
+  id             String         @id @default(uuid())
+  organization   Organization   @relation(fields: [organizationId], references: [id])
+  organizationId String
+  name           String
+  s3Key          String         // S3/GCS file path
+  folder         Folder?        @relation(fields: [folderId], references: [id])
+  folderId       String?
+  accessRoles    Role[]         @relation("DocumentRoles")
+  uploader       OrgUser        @relation(fields: [uploaderId], references: [id])
+  uploaderId     String
+  status         DocumentStatus
+  docType        String         // e.g. "pdf", "docx", "csv"
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  properties     String[]       // e.g., property/building IDs this doc is related to
+  author         String?
+  signedDate     DateTime?      // For contracts
+  metadata       Json?          // For extensible fields: tags, custom data, etc.
+  embeddings     Embedding[]
+}
+
+enum DocumentStatus {
+  UPLOADED
+  PROCESSING
+  READY
+  FAILED
+}
+
+// EMBEDDINGS AND RETRIEVAL METADATA
+model Embedding {
+  id           BigInt      @id @default(autoincrement())
+  document     Document    @relation(fields: [documentId], references: [id])
+  documentId   String
+  content      String      // text chunk
+  embedding    Unsupported("vector(1536)")  // pgvector field
+  chunkIndex   Int
+  section      String?     // e.g., "1.2", "Introduction"
+  pageNumber   Int?
+  author       String?
+  date         DateTime?
+  property     String?     // for hybrid search
+  docType      String?
+  createdAt    DateTime    @default(now())
+}
+
+// PROPERTY
+model Property {
+  id             String         @id @default(uuid())
+  organization   Organization   @relation(fields: [organizationId], references: [id])
+  organizationId String
+  name           String
+  address        String?
+  // Optionally, connect to docs and users
+  managers       OrgUser[]      @relation("PropertyManagers")
+}
+
+// AGENTIC WORKFLOWS & TOOL CALLS(to be implemented after I get the main features done)
+model Workflow {
+  id             String         @id @default(uuid())
+  organization   Organization   @relation(fields: [organizationId], references: [id])
+  organizationId String
+  initiator      OrgUser        @relation(fields: [initiatorId], references: [id])
+  initiatorId    String
+  type           String         // e.g., "summarization", "comparison", "translation"
+  parameters     Json?
+  status         WorkflowStatus
+  startedAt      DateTime       @default(now())
+  completedAt    DateTime?
+  result         Json?
+  toolCalls      ToolCall[]
+}
+
+enum WorkflowStatus {
+  RUNNING
+  COMPLETED
+  FAILED
+  WAITING_FOR_USER
+}
+
+model ToolCall {
+  id           String     @id @default(uuid())
+  workflow     Workflow   @relation(fields: [workflowId], references: [id])
+  workflowId   String
+  toolType     String     // e.g., "retriever", "summarizer", "translator", "calendar"
+  input        Json
+  output       Json?
+  startedAt    DateTime   @default(now())
+  completedAt  DateTime?
+  status       ToolCallStatus
+}
+
+enum ToolCallStatus {
+  RUNNING
+  COMPLETED
+  FAILED
+}
