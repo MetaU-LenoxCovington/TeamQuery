@@ -14,183 +14,342 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// USER AND AUTH
-model User {
-  id             String        @id @default(uuid())
-  email          String        @unique
-  name           String?
-  passwordHash   String?       // null if using SSO only
-  orgUsers       OrgUser[]
-  createdAt      DateTime      @default(now())
+enum MembershipRole {
+  ADMIN
+  MEMBER
 }
 
-model OrgUser {
-  id               String         @id @default(uuid())
-  user             User           @relation(fields: [userId], references: [id])
-  userId           String
-  organization     Organization   @relation(fields: [organizationId], references: [id])
-  organizationId   String
-  role             Role           @relation(fields: [roleId], references: [id])
-  roleId           String
-  status           OrgUserStatus  @default(ACTIVE)
-  // e.g., array of property/building IDs user is assigned to manage
-  assignedProperties String[]     // property IDs/names/labels relevant to the org
-  joinedAt         DateTime       @default(now())
-  workflows        Workflow[]
-  properties       Property[]     @relation("PropertyManagers")
-  documents        Document[]
-}
-
-enum OrgUserStatus {
-  ACTIVE
-  INVITED
-  DISABLED
-}
-
-// ORGANIZATION & ROLES
 model Organization {
-  id          String      @id @default(uuid())
-  name        String
-  orgUsers    OrgUser[]
-  roles       Role[]
-  documents   Document[]
-  folders     Folder[]
-  properties  Property[]
-  workflows   Workflow[]
-  createdAt   DateTime    @default(now())
+  id String @id @default(cuid())
+  name String
+  maxWords Int?
+  currentWordCount Int @default(0)
+  lastIndexUpdate DateTime?
+  lastDataChange DateTime @default(now())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  adminUserId String
+  adminUser User @relation("AdminOrganizations", fields: [adminUserId], references: [id])
+
+  memberships       OrganizationMembership[]
+  documents         Document[]
+  folders           Folder[]
+  permissionsGroups PermissionsGroup[]
+  auditLogs         AuditLog[]
+  searchQueries     SearchQuery[]
+
+  @@index([adminUserId])
 }
 
-model Role {
-  id             String          @id @default(uuid())
-  name           String
-  organization   Organization    @relation(fields: [organizationId], references: [id])
+model User {
+  id String @id @default(cuid())
+  email String @unique
+  password String
+  name String
+  searchMetadata Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  memberships        OrganizationMembership[]
+  adminOrganizations Organization[] @relation("AdminOrganizations")
+  auditLogs          AuditLog[]
+  searchQueries      SearchQuery[]
+  documentAccesses   DocumentAccess[]
+
+  // Access control relations
+  documentAccess   DocumentUserAccess[]
+  chunkAccess      ChunkUserAccess[]
+  embeddingAccess  EmbeddingUserAccess[]
+
+  @@index([email])
+}
+
+model PermissionsGroup {
+  id String @id @default(cuid())
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   organizationId String
-  permissions    RolePermission[]
-  // If this role is above others, specify a precedence (lower = more powerful)
-  precedence     Int             @default(100)
-  description    String?
-  orgUsers       OrgUser[]
-  folders        Folder[]        @relation("FolderRoles")
-  documents      Document[]      @relation("DocumentRoles")
+  name String
+  description String?
+  permissions Json
+  memberships OrganizationMembership[]
+
+  // Relations for access control
+  documentAccess   DocumentGroupAccess[]
+  chunkAccess      ChunkGroupAccess[]
+  embeddingAccess  EmbeddingGroupAccess[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([organizationId, name])
+  @@index([organizationId])
 }
 
-model RolePermission {
-  id           String    @id @default(uuid())
-  role         Role      @relation(fields: [roleId], references: [id])
-  roleId       String
-  actions       String[]    // e.g. "upload", "view", "delete", "manage_users", "share", "configure_access"
-  resources     String[]    // "document", "folder", "workflow", or more granular ("property:<id>")
-  constraint   String?   // optional, e.g., "only-own"
+model OrganizationMembership {
+  id     String   @id @default(cuid())
+  userId String
+  role   MembershipRole @default(MEMBER)
+  status MembershipStatus @default(PENDING)
+
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organizationId String
+
+  permissionsGroup   PermissionsGroup? @relation(fields: [permissionsGroupId], references: [id])
+  permissionsGroupId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, organizationId])
+  @@index([organizationId])
+  @@index([userId])
 }
 
-// DOCUMENT/FOLDER/PROPERTY STRUCTURE
+enum MembershipStatus {
+  PENDING
+  ACTIVE
+  REJECTED
+}
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  userId      String
+  organizationId String
+  action      String
+  targetType  String
+  targetId    String?
+  details     Json?
+
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([organizationId])
+  @@index([userId])
+  @@index([createdAt])
+}
+
 model Folder {
-  id             String         @id @default(uuid())
-  organization   Organization   @relation(fields: [organizationId], references: [id])
+  id            String   @id @default(cuid())
+  name          String
+  isDeleted     Boolean @default(false)
   organizationId String
-  name           String
-  parentFolder   Folder?        @relation("FolderToFolder", fields: [parentId], references: [id])
-  parentId       String?
-  subFolders     Folder[]       @relation("FolderToFolder")
-  documents      Document[]
-  accessRoles    Role[]         @relation("FolderRoles")
-  createdAt      DateTime       @default(now())
+
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  documents       Document[]
+  parentFolder    Folder? @relation("FolderParent", fields: [parentFolderId], references: [id])
+  parentFolderId  String?
+  childFolders    Folder[] @relation("FolderParent")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([organizationId])
+  @@index([parentFolderId])
 }
 
 model Document {
-  id             String         @id @default(uuid())
-  organization   Organization   @relation(fields: [organizationId], references: [id])
+  id            String   @id @default(cuid())
+  title         String
+  isDeleted     Boolean @default(false)
   organizationId String
-  name           String
-  s3Key          String         // S3/GCS file path
-  folder         Folder?        @relation(fields: [folderId], references: [id])
-  folderId       String?
-  accessRoles    Role[]         @relation("DocumentRoles")
-  uploader       OrgUser        @relation(fields: [uploaderId], references: [id])
-  uploaderId     String
-  status         DocumentStatus
-  docType        String         // e.g. "pdf", "docx", "csv"
-  createdAt      DateTime       @default(now())
-  updatedAt      DateTime       @updatedAt
-  properties     String[]       // e.g., property/building IDs this doc is related to
-  author         String?
-  signedDate     DateTime?      // For contracts
-  metadata       Json?          // For extensible fields: tags, custom data, etc.
-  embeddings     Embedding[]
+
+  // S3 file storage
+  s3Bucket      String?
+  s3Key         String?
+  originalFileName String?
+  fileSize      Int?
+  mimeType      String?
+
+  organization  Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  allowedGroups DocumentGroupAccess[]
+  allowedUsers  DocumentUserAccess[]
+  accesses      DocumentAccess[]
+
+  folder   Folder? @relation(fields: [folderId], references: [id], onDelete: SetNull)
+  folderId String?
+
+  recency       Int @default(0)
+  popularity    Int @default(0)
+
+  chunks        Chunk[]
+  embeddings    Embedding[]
+  metadata      Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([organizationId])
+  @@index([folderId])
+  @@index([isDeleted])
+  @@index([recency])
+  @@index([popularity])
+  @@index([s3Key])
 }
 
-enum DocumentStatus {
-  UPLOADED
-  PROCESSING
-  READY
-  FAILED
+model Chunk {
+  id          String   @id @default(cuid())
+  content     String
+  metadata      Json?
+
+  allowedGroups ChunkGroupAccess[]
+  allowedUsers  ChunkUserAccess[]
+
+  isDeleted     Boolean @default(false)
+
+  document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  documentId String
+  embedding  Embedding?
+
+  recency       Int @default(0)
+  popularity    Int @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([documentId])
+  @@index([isDeleted])
+  @@index([recency])
+  @@index([popularity])
 }
 
-// EMBEDDINGS AND RETRIEVAL METADATA
 model Embedding {
-  id           BigInt      @id @default(autoincrement())
-  document     Document    @relation(fields: [documentId], references: [id])
-  documentId   String
-  content      String      // text chunk
-  embedding    Unsupported("vector(1536)")  // pgvector field
-  chunkIndex   Int
-  section      String?     // e.g., "1.2", "Introduction"
-  pageNumber   Int?
-  author       String?
-  date         DateTime?
-  property     String?     // for hybrid search
-  docType      String?
-  createdAt    DateTime    @default(now())
+  id          String   @id @default(cuid())
+  vector      Bytes
+  metadata      Json?
+
+  allowedGroups EmbeddingGroupAccess[]
+  allowedUsers  EmbeddingUserAccess[]
+
+  isDeleted     Boolean @default(false)
+
+  document    Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  documentId  String
+  chunk       Chunk    @relation(fields: [chunkId], references: [id], onDelete: Cascade)
+  chunkId     String   @unique
+
+  recency       Int @default(0)
+  popularity    Int @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([documentId])
+  @@index([chunkId])
+  @@index([isDeleted])
+  @@index([recency])
+  @@index([popularity])
 }
 
-// PROPERTY
-model Property {
-  id             String         @id @default(uuid())
-  organization   Organization   @relation(fields: [organizationId], references: [id])
+// Join table for document-level group access
+model DocumentGroupAccess {
+  document    Document         @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  documentId  String
+  group       PermissionsGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  groupId     String
+
+  @@id([documentId, groupId])
+  @@index([documentId])
+  @@index([groupId])
+}
+
+// Join table for document-level user access
+model DocumentUserAccess {
+  document    Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  documentId  String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId      String
+
+  @@id([documentId, userId])
+  @@index([documentId])
+  @@index([userId])
+}
+
+// Join table for chunk-level group access
+model ChunkGroupAccess {
+  chunk      Chunk            @relation(fields: [chunkId], references: [id], onDelete: Cascade)
+  chunkId    String
+  group      PermissionsGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  groupId    String
+
+  @@id([chunkId, groupId])
+  @@index([chunkId])
+  @@index([groupId])
+}
+
+// Join table for chunk-level user access
+model ChunkUserAccess {
+  chunk      Chunk @relation(fields: [chunkId], references: [id], onDelete: Cascade)
+  chunkId    String
+  user       User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId     String
+
+  @@id([chunkId, userId])
+  @@index([chunkId])
+  @@index([userId])
+}
+
+// Join table for embedding-level group access
+model EmbeddingGroupAccess {
+  embedding   Embedding        @relation(fields: [embeddingId], references: [id], onDelete: Cascade)
+  embeddingId String
+  group       PermissionsGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  groupId     String
+
+  @@id([embeddingId, groupId])
+  @@index([embeddingId])
+  @@index([groupId])
+}
+
+// Join table for embedding-level user access
+model EmbeddingUserAccess {
+  embedding   Embedding @relation(fields: [embeddingId], references: [id], onDelete: Cascade)
+  embeddingId String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId      String
+
+  @@id([embeddingId, userId])
+  @@index([embeddingId])
+  @@index([userId])
+}
+
+// access tracking
+model DocumentAccess {
+  id String @id @default(cuid())
+
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId     String
+  document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  documentId String
+
+  accessCount    Int @default(1)
+  lastAccessedAt DateTime @default(now())
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([userId, documentId])
+  @@index([userId])
+  @@index([documentId])
+  @@index([lastAccessedAt])
+}
+
+// Search analytics
+model SearchQuery {
+  id String @id @default(cuid())
+
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId         String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   organizationId String
-  name           String
-  address        String?
-  // Optionally, connect to docs and users
-  managers       OrgUser[]      @relation("PropertyManagers")
-}
 
-// AGENTIC WORKFLOWS & TOOL CALLS(to be implemented after I get the main features done)
-model Workflow {
-  id             String         @id @default(uuid())
-  organization   Organization   @relation(fields: [organizationId], references: [id])
-  organizationId String
-  initiator      OrgUser        @relation(fields: [initiatorId], references: [id])
-  initiatorId    String
-  type           String         // e.g., "summarization", "comparison", "translation"
-  parameters     Json?
-  status         WorkflowStatus
-  startedAt      DateTime       @default(now())
-  completedAt    DateTime?
-  result         Json?
-  toolCalls      ToolCall[]
-}
+  query        String
+  resultsCount Int
+  timestamp    DateTime @default(now())
 
-enum WorkflowStatus {
-  RUNNING
-  COMPLETED
-  FAILED
-  WAITING_FOR_USER
-}
-
-model ToolCall {
-  id           String     @id @default(uuid())
-  workflow     Workflow   @relation(fields: [workflowId], references: [id])
-  workflowId   String
-  toolType     String     // e.g., "retriever", "summarizer", "translator", "calendar"
-  input        Json
-  output       Json?
-  startedAt    DateTime   @default(now())
-  completedAt  DateTime?
-  status       ToolCallStatus
-}
-
-enum ToolCallStatus {
-  RUNNING
-  COMPLETED
-  FAILED
+  @@index([userId])
+  @@index([organizationId])
+  @@index([timestamp])
 }
