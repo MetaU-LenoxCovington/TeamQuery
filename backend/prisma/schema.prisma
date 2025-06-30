@@ -19,6 +19,11 @@ enum MembershipRole {
   MEMBER
 }
 
+enum AccessLevel {
+  READ
+  EDIT
+}
+
 model Organization {
   id String @id @default(cuid())
   name String
@@ -57,10 +62,8 @@ model User {
   searchQueries      SearchQuery[]
   documentAccesses   DocumentAccess[]
 
-  // Access control relations
+  // Access control relation
   documentAccess   DocumentUserAccess[]
-  chunkAccess      ChunkUserAccess[]
-  embeddingAccess  EmbeddingUserAccess[]
 
   @@index([email])
 }
@@ -71,13 +74,11 @@ model PermissionsGroup {
   organizationId String
   name String
   description String?
-  permissions Json
+  permissions String[] // Array of OrganizationPermission enum values
   memberships OrganizationMembership[]
 
   // Relations for access control
   documentAccess   DocumentGroupAccess[]
-  chunkAccess      ChunkGroupAccess[]
-  embeddingAccess  EmbeddingGroupAccess[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -195,9 +196,6 @@ model Chunk {
   content     String
   metadata      Json?
 
-  allowedGroups ChunkGroupAccess[]
-  allowedUsers  ChunkUserAccess[]
-
   isDeleted     Boolean @default(false)
 
   document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
@@ -220,9 +218,6 @@ model Embedding {
   id          String   @id @default(cuid())
   vector      Bytes
   metadata      Json?
-
-  allowedGroups EmbeddingGroupAccess[]
-  allowedUsers  EmbeddingUserAccess[]
 
   isDeleted     Boolean @default(false)
 
@@ -251,6 +246,10 @@ model DocumentGroupAccess {
   group       PermissionsGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
   groupId     String
 
+  accessLevel AccessLevel
+  grantedBy   String      // userId who granted access
+  grantedAt   DateTime    @default(now())
+
   @@id([documentId, groupId])
   @@index([documentId])
   @@index([groupId])
@@ -263,58 +262,15 @@ model DocumentUserAccess {
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId      String
 
+  accessLevel AccessLevel
+  grantedBy   String      // userId who granted access
+  grantedAt   DateTime    @default(now())
+
   @@id([documentId, userId])
   @@index([documentId])
   @@index([userId])
 }
 
-// Join table for chunk-level group access
-model ChunkGroupAccess {
-  chunk      Chunk            @relation(fields: [chunkId], references: [id], onDelete: Cascade)
-  chunkId    String
-  group      PermissionsGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
-  groupId    String
-
-  @@id([chunkId, groupId])
-  @@index([chunkId])
-  @@index([groupId])
-}
-
-// Join table for chunk-level user access
-model ChunkUserAccess {
-  chunk      Chunk @relation(fields: [chunkId], references: [id], onDelete: Cascade)
-  chunkId    String
-  user       User  @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId     String
-
-  @@id([chunkId, userId])
-  @@index([chunkId])
-  @@index([userId])
-}
-
-// Join table for embedding-level group access
-model EmbeddingGroupAccess {
-  embedding   Embedding        @relation(fields: [embeddingId], references: [id], onDelete: Cascade)
-  embeddingId String
-  group       PermissionsGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
-  groupId     String
-
-  @@id([embeddingId, groupId])
-  @@index([embeddingId])
-  @@index([groupId])
-}
-
-// Join table for embedding-level user access
-model EmbeddingUserAccess {
-  embedding   Embedding @relation(fields: [embeddingId], references: [id], onDelete: Cascade)
-  embeddingId String
-  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId      String
-
-  @@id([embeddingId, userId])
-  @@index([embeddingId])
-  @@index([userId])
-}
 
 // access tracking
 model DocumentAccess {
