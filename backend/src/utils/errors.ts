@@ -1,6 +1,7 @@
 export const ERROR_CODES = {
     INVALID_CREDENTIALS: 1001,
 		TOKEN_EXPIRED: 1002,
+		TOKEN_INVALID: 1003,
   };
 
 export abstract class BaseError extends Error {
@@ -49,6 +50,10 @@ export class AuthError extends BaseError {
 
   static tokenExpired(message: string = 'Access token has expired') {
     return new AuthError(message, ERROR_CODES.TOKEN_EXPIRED);
+  }
+
+  static tokenInvalid(message: string = 'Invalid access token') {
+    return new AuthError(message, ERROR_CODES.TOKEN_INVALID);
   }
 
 }
