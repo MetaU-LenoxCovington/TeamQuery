@@ -4,6 +4,7 @@ export const ERROR_CODES = {
 		TOKEN_INVALID: 1003,
 		TOKEN_MISSING: 1004,
 		REFRESH_TOKEN_INVALID: 1005,
+		REFRESH_TOKEN_EXPIRED: 1006,
   };
 
 export abstract class BaseError extends Error {
@@ -64,6 +65,10 @@ export class AuthError extends BaseError {
 
 	static refreshTokenInvalid(message: string = 'Invalid refresh token') {
     return new AuthError(message, ERROR_CODES.REFRESH_TOKEN_INVALID);
+  }
+
+	static refreshTokenExpired(message: string = 'Refresh token has expired') {
+    return new AuthError(message, ERROR_CODES.REFRESH_TOKEN_EXPIRED);
   }
 
 }
