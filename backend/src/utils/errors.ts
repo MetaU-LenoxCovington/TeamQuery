@@ -7,6 +7,7 @@ export const ERROR_CODES = {
 		REFRESH_TOKEN_EXPIRED: 1006,
 
 		INSUFFICIENT_PERMISSIONS: 1101,
+		ORGANIZATION_ACCESS_DENIED: 1102,
   };
 
 export abstract class BaseError extends Error {
@@ -83,4 +84,9 @@ export class PermissionError extends BaseError {
   static insufficientPermissions(message: string = 'Insufficient permissions to perform this action') {
     return new PermissionError(message, ERROR_CODES.INSUFFICIENT_PERMISSIONS);
   }
+
+	static organizationAccessDenied(message: string = 'Access denied to this organization') {
+    return new PermissionError(message, ERROR_CODES.ORGANIZATION_ACCESS_DENIED);
+  }
+
 }
