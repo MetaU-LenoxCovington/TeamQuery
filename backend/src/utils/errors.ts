@@ -8,6 +8,7 @@ export const ERROR_CODES = {
 
 		INSUFFICIENT_PERMISSIONS: 1101,
 		ORGANIZATION_ACCESS_DENIED: 1102,
+		DOCUMENT_ACCESS_DENIED: 1103,
   };
 
 export abstract class BaseError extends Error {
@@ -87,6 +88,10 @@ export class PermissionError extends BaseError {
 
 	static organizationAccessDenied(message: string = 'Access denied to this organization') {
     return new PermissionError(message, ERROR_CODES.ORGANIZATION_ACCESS_DENIED);
+  }
+
+  static documentAccessDenied(message: string = 'Access denied to this document') {
+    return new PermissionError(message, ERROR_CODES.DOCUMENT_ACCESS_DENIED);
   }
 
 }
