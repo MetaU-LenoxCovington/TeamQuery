@@ -5,6 +5,8 @@ export const ERROR_CODES = {
 		TOKEN_MISSING: 1004,
 		REFRESH_TOKEN_INVALID: 1005,
 		REFRESH_TOKEN_EXPIRED: 1006,
+
+		INSUFFICIENT_PERMISSIONS: 1101,
   };
 
 export abstract class BaseError extends Error {
@@ -71,4 +73,10 @@ export class AuthError extends BaseError {
     return new AuthError(message, ERROR_CODES.REFRESH_TOKEN_EXPIRED);
   }
 
+}
+
+export class PermissionError extends BaseError {
+  constructor(message: string, code: number = ERROR_CODES.INSUFFICIENT_PERMISSIONS) {
+    super(message, code, 403);
+  }
 }
