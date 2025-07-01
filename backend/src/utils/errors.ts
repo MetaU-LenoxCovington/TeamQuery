@@ -10,6 +10,7 @@ export const ERROR_CODES = {
 		ORGANIZATION_ACCESS_DENIED: 1102,
 		DOCUMENT_ACCESS_DENIED: 1103,
 		ADMIN_REQUIRED: 1104,
+		MEMBERSHIP_REQUIRED: 1105,
   };
 
 export abstract class BaseError extends Error {
@@ -97,6 +98,10 @@ export class PermissionError extends BaseError {
 
 	static adminRequired(message: string = 'Administrator privileges required') {
     return new PermissionError(message, ERROR_CODES.ADMIN_REQUIRED);
+  }
+
+	static membershipRequired(message: string = 'Organization membership required') {
+    return new PermissionError(message, ERROR_CODES.MEMBERSHIP_REQUIRED);
   }
 
 }
