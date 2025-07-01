@@ -79,4 +79,8 @@ export class PermissionError extends BaseError {
   constructor(message: string, code: number = ERROR_CODES.INSUFFICIENT_PERMISSIONS) {
     super(message, code, 403);
   }
+
+  static insufficientPermissions(message: string = 'Insufficient permissions to perform this action') {
+    return new PermissionError(message, ERROR_CODES.INSUFFICIENT_PERMISSIONS);
+  }
 }
