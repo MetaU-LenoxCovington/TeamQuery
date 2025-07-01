@@ -9,6 +9,7 @@ export const ERROR_CODES = {
 		INSUFFICIENT_PERMISSIONS: 1101,
 		ORGANIZATION_ACCESS_DENIED: 1102,
 		DOCUMENT_ACCESS_DENIED: 1103,
+		ADMIN_REQUIRED: 1104,
   };
 
 export abstract class BaseError extends Error {
@@ -92,6 +93,10 @@ export class PermissionError extends BaseError {
 
   static documentAccessDenied(message: string = 'Access denied to this document') {
     return new PermissionError(message, ERROR_CODES.DOCUMENT_ACCESS_DENIED);
+  }
+
+	static adminRequired(message: string = 'Administrator privileges required') {
+    return new PermissionError(message, ERROR_CODES.ADMIN_REQUIRED);
   }
 
 }
