@@ -11,6 +11,10 @@ export const ERROR_CODES = {
 		DOCUMENT_ACCESS_DENIED: 1103,
 		ADMIN_REQUIRED: 1104,
 		MEMBERSHIP_REQUIRED: 1105,
+
+		INVALID_EMAIL: 1201,
+		MISSING_REQUIRED_FIELD: 1203,
+		INVALID_INPUT_FORMAT: 1204,
   };
 
 export abstract class BaseError extends Error {
@@ -104,4 +108,45 @@ export class PermissionError extends BaseError {
     return new PermissionError(message, ERROR_CODES.MEMBERSHIP_REQUIRED);
   }
 
+}
+
+export class ValidationError extends BaseError {
+  public readonly field?: string;
+  public readonly value?: any;
+
+  constructor(
+    message: string,
+    code: number = ERROR_CODES.INVALID_INPUT_FORMAT,
+    field?: string,
+    value?: any
+  ) {
+    super(message, code, 400);
+    this.field = field;
+    this.value = value;
+  }
+
+  static invalidEmail(email: string) {
+    return new ValidationError(
+      'Invalid email format',
+      ERROR_CODES.INVALID_EMAIL,
+      'email',
+      email
+    );
+  }
+
+  static missingField(field: string) {
+    return new ValidationError(
+      `Required field '${field}' is missing`,
+      ERROR_CODES.MISSING_REQUIRED_FIELD,
+      field
+    );
+  }
+
+  toJSON() {
+    return {
+      ...super.toJSON(),
+      field: this.field,
+      value: this.value,
+    };
+  }
 }
