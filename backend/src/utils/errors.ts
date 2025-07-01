@@ -2,6 +2,7 @@ export const ERROR_CODES = {
     INVALID_CREDENTIALS: 1001,
 		TOKEN_EXPIRED: 1002,
 		TOKEN_INVALID: 1003,
+		TOKEN_MISSING: 1004,
   };
 
 export abstract class BaseError extends Error {
@@ -54,6 +55,10 @@ export class AuthError extends BaseError {
 
   static tokenInvalid(message: string = 'Invalid access token') {
     return new AuthError(message, ERROR_CODES.TOKEN_INVALID);
+  }
+
+	static tokenMissing(message: string = 'Access token is required') {
+    return new AuthError(message, ERROR_CODES.TOKEN_MISSING);
   }
 
 }
