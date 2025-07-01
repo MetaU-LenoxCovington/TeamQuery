@@ -3,6 +3,7 @@ export const ERROR_CODES = {
 		TOKEN_EXPIRED: 1002,
 		TOKEN_INVALID: 1003,
 		TOKEN_MISSING: 1004,
+		REFRESH_TOKEN_INVALID: 1005,
   };
 
 export abstract class BaseError extends Error {
@@ -59,6 +60,10 @@ export class AuthError extends BaseError {
 
 	static tokenMissing(message: string = 'Access token is required') {
     return new AuthError(message, ERROR_CODES.TOKEN_MISSING);
+  }
+
+	static refreshTokenInvalid(message: string = 'Invalid refresh token') {
+    return new AuthError(message, ERROR_CODES.REFRESH_TOKEN_INVALID);
   }
 
 }
