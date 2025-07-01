@@ -1,5 +1,6 @@
 export const ERROR_CODES = {
     INVALID_CREDENTIALS: 1001,
+		TOKEN_EXPIRED: 1002,
   };
 
 export abstract class BaseError extends Error {
@@ -38,12 +39,16 @@ export abstract class BaseError extends Error {
 }
 
 export class AuthError extends BaseError {
-    constructor(message: string, code: number = ERROR_CODES.INVALID_CREDENTIALS) {
-      super(message, code, 401);
-    }
-
-    static invalidCredentials(message: string = 'Invalid email or password') {
-        return new AuthError(message, ERROR_CODES.INVALID_CREDENTIALS);
-      }
-
+  constructor(message: string, code: number = ERROR_CODES.INVALID_CREDENTIALS) {
+    super(message, code, 401);
   }
+
+  static invalidCredentials(message: string = 'Invalid email or password') {
+    return new AuthError(message, ERROR_CODES.INVALID_CREDENTIALS);
+  }
+
+  static tokenExpired(message: string = 'Access token has expired') {
+    return new AuthError(message, ERROR_CODES.TOKEN_EXPIRED);
+  }
+
+}
