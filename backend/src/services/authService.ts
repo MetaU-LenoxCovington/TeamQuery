@@ -187,6 +187,15 @@ export class AuthService {
 		sessionId: payload.sessionId,
 	});
 
+	const newRefreshTokenRecord = await prisma.refreshToken.create({
+		data: {
+			token: crypto.randomUUID(),
+			userId: user.id,
+			organizationId: payload.organizationId,
+			expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 7), // 7 days
+		}
+	});
+
 		} catch {
 
 		}
