@@ -117,5 +117,12 @@ export class AuthService {
 			name: user.name,
 			sessionId
 		});
+
+		const refreshToken = JWTUtils.generateRefreshToken({
+			userId: user.id,
+			organizationId: data.organizationId,
+			tokenId: refreshTokenRecord.id,
+			sessionId,
+		});
 	}
 }
