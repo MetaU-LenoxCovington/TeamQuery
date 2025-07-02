@@ -47,4 +47,21 @@ export class PermissionService {
             })),
         };
     }
+
+    async getAccessibleDocumentIds(userId: string, organizationId: string): Promise<string[] | undefined> {
+        const permissions = await this.getUserPermissions(userId, organizationId);
+
+        if ( permissions.isAdmin) {
+            const documents = await prisma.document.findMany({
+                where: {
+                    organizationId,
+                    isDeleted: false,
+                },
+                select: { id: true}
+            });
+            return documents.map( (d: any) => d.id);
+        }
+
+    }
+
 }
