@@ -65,4 +65,9 @@ export class AuthService {
 			userId: result.user.id,
 		};
 	}
+
+	async login( data: LoginRequest ): Promise<LoginResponse> {
+		if ( !data.email || !data.password || !organizationId) {
+			throw ValidationError.missingField('email, password, or organizationId is missing');
+		}
 }
