@@ -27,18 +27,42 @@ export class AuthService {
 
 		const hashedPassword = await PasswordUtils.hash(data.password);
 
-		const user = await prisma.user.create({
-			data: { email: data.email, password: hashedPassword, name: data.name }
-		});
+		const result = await prisma.$transaction( async (tx: any) => {
+			const user = await tx.user.create({
+				data: {
+					email: data.email,
+					password: hashedPassword,
+					name: data.name,
+				}
+			});
 
-		const organization = await prisma.organization.create({
-			data: { name: data.organizationName, adminUserId: user.id }
-		});
+			let organization;
+			if ( data.organizationName ) {
+				organization = await tx.organization.create({
+					data: {
+						name: data.organizationName,
+						adminUserId: user.id,
+					}
+				});
 
-		const membership = await prisma.organizationMembership.create({
-			data: { userId: user.id, organizationId: organization.id, role: 'ADMIN' }
-		});
+				await tx.organizationMembership.create({
+					data: {
+						userId: user.id,
+						organizationId: organization.id,
+						role: 'ADMIN',
+						canUpload: true,
+						canDelete: true,
+						canManageUsers: true,
+					}
+				});
 
-		return  user;
+		return {user, organization};
+
+	}});
+
+		return {
+			message: 'User registered successfully',
+			userId: result.user.id,
+		};
 	}
 }
