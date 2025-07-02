@@ -172,6 +172,11 @@ export class AuthService {
 		throw new AuthError('User membership not found');
 	}
 
+	const sessionInfo = this.sessionService.getSessionInfo(payload.sessionId);
+	if (!sessionInfo) {
+		throw new AuthError('Session expired');
+	}
+
 
 		} catch {
 
