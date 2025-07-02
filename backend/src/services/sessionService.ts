@@ -83,6 +83,62 @@ export class SessionService extends EventEmitter {
 		})
 	}
 
+	updateSessionActivity(sessionId: string){
+		const session = this.activeSessions.get(sessionId);
+		if ( session ) {
+			session.lastActivity = new Date();
+		}
+	}
+
+	isOrganizationActive(organizationId: string): boolean {
+		const orgSessions = this.organizationSessions.get(organizationId);
+		if ( orgSessions ) {
+			return orgSessions.size > 0;
+		} else {
+			return false;
+		}
+	}
+
+	getActiveOrganizations(): string[] {
+		return Array.from(this.organizationSessions.keys());
+	}
+
+	getSessionInfo(sessionId: string): ActiveSession | undefined {
+		return this.activeSessions.get(sessionId);
+	}
+
+	// for when the server restarts
+	async restoreSessionsFromDatabase(): Promise<void> {
+		const activeSessions = await prisma.userSession.findMany({
+			where: {
+				expiresAt: { gt: new Date()}
+			}
+		});
+
+		for ( const dbSession of activeSessions ) {
+			const session: ActiveSession = {
+				sessionId: dbSession.id,
+				userId: dbSession.userId,
+				organizationId: dbSession.organizationId,
+				lastActivity: new Date(),
+				expiresAt: dbSession.expiresAt,
+			};
+
+			this.activeSessions.set(dbSession.id, session);
+
+			if (!this.organizationSessions.has(dbSession.organizationId)) {
+				this.organizationSessions.set(dbSession.organizationId, new Set());
+
+				this.emit('organizationFirstLogin', dbSession.organizationId);
+
+				const orgSessions = this.organizationSessions.get(dbSession.organizationId);
+				if (orgSessions){
+					orgSessions.add(dbSession.id);
+				}
+			}
+		}
+	}
+
 	private cleanupExpiredSessions(): void {
 		const now = new Date();
 		const expiredSessions: string[] = [];
@@ -96,6 +152,12 @@ export class SessionService extends EventEmitter {
 		expiredSessions.forEach(sessionId => {
 			this.destroySession(sessionId);
 		})
+	}
+
+	destroy(): void {
+		if (this.sessionCleanupInterval) {
+			clearInterval(this.sessionCleanupInterval);
+		}
 	}
 
 }
