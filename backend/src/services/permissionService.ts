@@ -62,6 +62,37 @@ export class PermissionService {
             return documents.map( (d: any) => d.id);
         }
 
+        const userGroupIds = permissions.groups.map((g: any) => g.id);
+
+        const accessConditions = [
+            { accessLevel: AccessLevel.PUBLIC},
+            {
+                accessLevel: AccessLevel.GROUP,
+                groupId: { in: userGroupIds }
+            },
+            {
+                accessLevel: AccessLevel.RESTRICTED,
+                restrictedToUsers: { has: userId }
+            }
+        ];
+
+        if (permissions.role === 'MANAGER' || permissions.role === 'ADMIN') {
+            accessConditions.push({
+                accessLevel: AccessLevel.MANAGERS
+            });
+        }
+
+        const documents = await prisma.document.findMany({
+            where: {
+                organizationId,
+                isDeleted: false,
+                OR: accessConditions,
+            },
+            select: { id: true }
+        });
+
+        return documents.map( (d: any) => d.id);
+
     }
 
 }
