@@ -25,5 +25,7 @@ export class AuthService {
 			throw new AuthError('User with this email already exists');
 		}
 
+		const hashedPassword = await PasswordUtils.hash(data.password);
+
 	}
 }
