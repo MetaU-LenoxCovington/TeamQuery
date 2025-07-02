@@ -6,6 +6,7 @@ export interface AccessTokenPayload {
   isAdmin: boolean;
   email: string;
   name: string;
+  sessionId: string;
   iat: number;
   exp: number;
 }
@@ -14,6 +15,7 @@ export interface RefreshTokenPayload {
   userId: string;
   organizationId: string;
   tokenId: string;
+  sessionId: string;
   iat: number;
   exp: number;
 }
@@ -39,6 +41,7 @@ export interface LoginRequest {
 export interface LoginResponse {
   accessToken: string;
   refreshToken: string;
+  sessionId: string;
   user: {
     id: string;
     email: string;
@@ -66,6 +69,7 @@ export interface AuthenticatedUser {
   isAdmin: boolean;
   email: string;
   name: string;
+  sessionId: string;
 }
 
 declare module 'express-serve-static-core' {
