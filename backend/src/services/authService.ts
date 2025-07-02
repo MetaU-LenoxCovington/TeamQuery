@@ -201,6 +201,13 @@ export class AuthService {
 		data: { isRevoked: true }
 	});
 
+	const newRefreshToken = JWTUtils.generateRefreshToken({
+		userId: user.id,
+		organizationId: payload.organizationId,
+		tokenId: newRefreshTokenRecord.id,
+		sessionId: payload.sessionId,
+	});
+
 		} catch {
 
 		}
