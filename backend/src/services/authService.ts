@@ -229,8 +229,13 @@ export class AuthService {
 			if (payload.sessionId) {
 				await this.sessionService.destroySession(payload.sessionId);
 			}
-		} catch (error) {
 
+			await prisma.refreshToken.update({
+				where: { id: payload.tokenId },
+				data: { isRevoked: true }
+			});
+		} catch (error) {
+			logger.warn('Logout with invalid token', error);
 		}
 	}
 }
