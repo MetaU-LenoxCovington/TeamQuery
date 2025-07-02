@@ -165,6 +165,14 @@ export class AuthService {
 		throw AuthError.refreshTokenExpired();
 	}
 
+	const user = refreshTokenRecord.user;
+	const membership = user.memberships[0];
+
+	if (!membership) {
+		throw new AuthError('User membership not found');
+	}
+
+
 		} catch {
 
 		}
