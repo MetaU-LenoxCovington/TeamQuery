@@ -106,6 +106,16 @@ export class AuthService {
 				organizationId: data.organizationId,
 				expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 7), // 7 days
 			}
-		})
+		});
+
+		const accessToken = JWTUtils.generateAccessToken({
+			userId: user.id,
+			organizationId: data.organizationId,
+			role: membership.role,
+			isAdmin: membership.role === 'ADMIN',
+			email: user.email,
+			name: user.name,
+			sessionId
+		});
 	}
 }
