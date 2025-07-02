@@ -99,5 +99,13 @@ export class AuthService {
 
 		const sessionId = await this.sessionService.createSession(user.id, data.organizationId);
 
+		const refreshTokenRecord = await prisma.refreshToken.create({
+			data: {
+				token: crypto.randomUUID(),
+				userId: user.id,
+				organizationId: data.organizationId,
+				expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 7), // 7 days
+			}
+		})
 	}
 }
