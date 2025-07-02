@@ -238,4 +238,16 @@ export class AuthService {
 			logger.warn('Logout with invalid token', error);
 		}
 	}
+
+	async logoutAll(userId: string, organizationId: string): Promise<void> {
+		await prisma.refreshToken.updateMany({
+			where: {
+				userId,
+				organizationId,
+				isRevoked: false,
+			},
+			data: { isRevoked: true }
+		});
+	}
+
 }
