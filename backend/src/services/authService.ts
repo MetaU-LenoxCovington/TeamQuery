@@ -248,6 +248,15 @@ export class AuthService {
 			},
 			data: { isRevoked: true }
 		});
+
+		const sessions = await prisma.userSession.findMany({
+			where: { userId, organizationId }
+		});
+
+		for (const session of sessions) {
+			await this.sessionService.destroySession(session.id);
+		}
 	}
+
 
 }
