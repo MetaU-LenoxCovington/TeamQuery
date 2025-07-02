@@ -87,5 +87,9 @@ export class AuthService {
 			throw AuthError.invalidCredentials();
 		}
 
+		const isValidPassword = await PasswordUtils.verify(user.password, data.password);
+		if (!isValidPassword) {
+			throw AuthError.invalidCredentials();
+		}
 	}
 }
