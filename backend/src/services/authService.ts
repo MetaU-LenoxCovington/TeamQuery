@@ -3,6 +3,7 @@ import { PasswordUtils } from '../utils/password';
 import { JWTUtils } from '../utils/jwt';
 import { AuthError, ValidationError } from '../utils/errors';
 import { SessionService } from './sessionService';
+import { logger }	from '../utils/logger';
 import {
   RegisterRequest,
   RegisterResponse,
@@ -218,6 +219,18 @@ export class AuthService {
 				throw error;
 			}
 			throw AuthError.refreshTokenInvalid();
+		}
+	}
+
+	async logout(refreshToken: string): Promise<void> {
+		try {
+			const payload = JWTUtils.verifyRefreshToken(refreshToken);
+
+			if (payload.sessionId) {
+				await this.sessionService.destroySession(payload.sessionId);
+			}
+		} catch (error) {
+
 		}
 	}
 }
