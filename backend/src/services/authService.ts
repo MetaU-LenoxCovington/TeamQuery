@@ -139,4 +139,34 @@ export class AuthService {
 			}
 		};
 	}
+
+	async refresh( data: RefreshRequest ): Promise<RefreshResponse> {
+		try {
+			const payload = JWTUtils.verifyRefreshToken(data.refreshToken);
+
+			const refreshTokenRecord = await prisma.refreshToken.findUnique({
+				where: { id: payload.tokenId },
+				include: {
+					user: {
+						include: {
+							memberships: {
+								where: { organizationId: payload.organizationId },
+							}
+					}
+			}
+		}
+	});
+
+	if (!refreshTokenRecord || refreshTokenRecord.isRevoked) {
+		throw AuthError.refreshTokenInvalid();
+	}
+
+	if (refreshTokenRecord.expiresAt < new Date()) {
+		throw AuthError.refreshTokenExpired();
+	}
+
+		} catch {
+
+		}
+	}
 }
