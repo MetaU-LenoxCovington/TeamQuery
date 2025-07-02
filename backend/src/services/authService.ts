@@ -91,5 +91,10 @@ export class AuthService {
 		if (!isValidPassword) {
 			throw AuthError.invalidCredentials();
 		}
+
+		const membership = user.memberships[0];
+		if (!membership) {
+			throw new AuthError('User is not a member of the organization');
+		}
 	}
 }
