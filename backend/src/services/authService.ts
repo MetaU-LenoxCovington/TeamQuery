@@ -177,6 +177,15 @@ export class AuthService {
 		throw new AuthError('Session expired');
 	}
 
+	const accessToken = JWTUtils.generateAccessToken({
+		userId: user.id,
+		organizationId: payload.organizationId,
+		role: membership.role,
+		isAdmin: membership.role === 'ADMIN',
+		email: user.email,
+		name: user.name,
+		sessionId: payload.sessionId,
+	});
 
 		} catch {
 
