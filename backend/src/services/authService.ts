@@ -208,8 +208,16 @@ export class AuthService {
 		sessionId: payload.sessionId,
 	});
 
-		} catch {
+	return {
+		accessToken,
+		refreshToken: newRefreshToken,
+	}
 
+		} catch (error ) {
+			if (error instanceof AuthError) {
+				throw error;
+			}
+			throw AuthError.refreshTokenInvalid();
 		}
 	}
 }
