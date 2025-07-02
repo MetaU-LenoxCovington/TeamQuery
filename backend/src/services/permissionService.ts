@@ -40,7 +40,7 @@ export class PermissionService {
             canDelete: membership.canDelete,
             canManageUsers: membership.canManageUsers,
             isAdmin: membership.role === MembershipRole.ADMIN,
-            groups: membership.user.groupMemberships.map(membership => ({
+            groups: membership.user.groupMemberships.map((membership: any) => ({
                 id: membership.group.id,
                 name: membership.group.name,
                 role: membership.role,
