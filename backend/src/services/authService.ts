@@ -18,6 +18,10 @@ export class AuthService {
 
 	async register( data: RegisterRequest ): Promise<RegisterResponse> {
 
+		if ( !data.email || !data.password || !data.name ) {
+			throw ValidationError.missingField('email, password, or name is missing');
+		}
+
 		const existingUser = await prisma.user.findUnique({
 			where: { email: data.email }
 		});
@@ -256,6 +260,11 @@ export class AuthService {
 		for (const session of sessions) {
 			await this.sessionService.destroySession(session.id);
 		}
+	}
+
+	private isValidEmail(email: string): boolean {
+		const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+		return emailRegex.test(email);
 	}
 
 
