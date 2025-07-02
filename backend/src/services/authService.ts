@@ -13,9 +13,9 @@ import {
 } from '../types/auth';
 
 export class AuthService {
-	constructor( private sessionService: SessionService ) {}
+	constructor( private sessionService: SessionService ){}
 
-	async register( data: RegisterRequest ){
+	async register( data: RegisterRequest ): Promise<RegisterResponse> {
 
 		const existingUser = await prisma.user.findUnique({
 			where: { email: data.email }
@@ -27,5 +27,10 @@ export class AuthService {
 
 		const hashedPassword = await PasswordUtils.hash(data.password);
 
+		const user = await prisma.user.create({
+			data: { email: data.email, password: hashedPassword, name: data.name }
+		});
+
+		return  user;
 	}
 }
