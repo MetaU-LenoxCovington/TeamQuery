@@ -13,5 +13,17 @@ import {
 } from '../types/auth';
 
 export class AuthService {
+	constructor( private sessionService: SessionService ) {}
 
+	async register( data: RegisterRequest ){
+
+		const existingUser = await prisma.user.findUnique({
+			where: { email: data.email }
+		});
+
+		if ( existingUser ) {
+			throw new AuthError('User with this email already exists');
+		}
+
+	}
 }
