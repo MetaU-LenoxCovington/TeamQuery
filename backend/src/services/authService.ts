@@ -22,6 +22,10 @@ export class AuthService {
 			throw ValidationError.missingField('email, password, or name is missing');
 		}
 
+		if ( !this.isValidEmail(data.email) ) {
+			throw ValidationError.invalidInputFormat('email', data.email);
+		}
+
 		const existingUser = await prisma.user.findUnique({
 			where: { email: data.email }
 		});

@@ -125,12 +125,12 @@ export class ValidationError extends BaseError {
     this.value = value;
   }
 
-  static invalidEmail(email: string) {
+  static invalidInputFormat(field: string, value: any) {
     return new ValidationError(
-      'Invalid email format',
-      ERROR_CODES.INVALID_EMAIL,
-      'email',
-      email
+      `Invalid input format for field '${field}'`,
+      ERROR_CODES.INVALID_INPUT_FORMAT,
+      field,
+      value
     );
   }
 
