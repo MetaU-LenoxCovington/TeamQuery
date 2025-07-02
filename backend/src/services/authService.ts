@@ -196,6 +196,11 @@ export class AuthService {
 		}
 	});
 
+	await prisma.refreshToken.update({
+		where: { id: payload.tokenId },
+		data: { isRevoked: true }
+	});
+
 		} catch {
 
 		}
