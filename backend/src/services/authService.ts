@@ -67,7 +67,25 @@ export class AuthService {
 	}
 
 	async login( data: LoginRequest ): Promise<LoginResponse> {
-		if ( !data.email || !data.password || !organizationId) {
+		if ( !data.email || !data.password || !data.organizationId) {
 			throw ValidationError.missingField('email, password, or organizationId is missing');
 		}
+
+		const user = await prisma.user.findUnique({
+			where: { email: data.email },
+			include: {
+				memberships: {
+					where: { organizationId: data.organizationId },
+					innclude: {
+						organization: true,
+					}
+				}
+			}
+		});
+
+		if ( !user ) {
+			throw AuthError.invalidCredentials();
+		}
+
+	}
 }
