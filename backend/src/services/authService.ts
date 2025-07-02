@@ -124,5 +124,19 @@ export class AuthService {
 			tokenId: refreshTokenRecord.id,
 			sessionId,
 		});
+
+		return {
+			accessToken,
+			refreshToken,
+			sessionId,
+			user: {
+				id: user.id,
+				email: user.email,
+				name: user.name,
+				organizationId: data.organizationId,
+				role: membership.role,
+				isAdmin: membership.role === 'ADMIN',
+			}
+		};
 	}
 }
