@@ -96,5 +96,8 @@ export class AuthService {
 		if (!membership) {
 			throw new AuthError('User is not a member of the organization');
 		}
+
+		const sessionId = await this.sessionService.createSession(user.id, data.organizationId);
+
 	}
 }
