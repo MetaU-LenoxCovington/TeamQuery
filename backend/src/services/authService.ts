@@ -31,6 +31,10 @@ export class AuthService {
 			data: { email: data.email, password: hashedPassword, name: data.name }
 		});
 
+		const organization = await prisma.organization.create({
+			data: { name: data.organizationName, adminUserId: user.id }
+		});
+
 		return  user;
 	}
 }
