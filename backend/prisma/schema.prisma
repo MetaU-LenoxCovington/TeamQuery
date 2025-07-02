@@ -72,6 +72,7 @@ model User {
   searchQueries      SearchQuery[]
   documentAccesses   DocumentAccess[]
   refreshTokens      RefreshToken[]
+  sessions           UserSession[]
 
   @@index([email])
 }
@@ -297,5 +298,20 @@ model RefreshToken {
 
   @@index([userId])
   @@index([token])
+  @@index([expiresAt])
+}
+
+model UserSession {
+  id             String   @id
+  userId         String
+  organizationId String
+  expiresAt      DateTime
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([organizationId])
   @@index([expiresAt])
 }
