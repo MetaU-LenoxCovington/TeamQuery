@@ -35,6 +35,10 @@ export class AuthService {
 			data: { name: data.organizationName, adminUserId: user.id }
 		});
 
+		const membership = await prisma.organizationMembership.create({
+			data: { userId: user.id, organizationId: organization.id, role: 'ADMIN' }
+		});
+
 		return  user;
 	}
 }
