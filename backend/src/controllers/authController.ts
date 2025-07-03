@@ -48,7 +48,6 @@ const sessionService = new SessionService();
         }
     }
 
-
     // POST /api/auth/logout-all
     async logoutAll(req: Request, res: Response, next: NextFunction) {
         try {
@@ -70,7 +69,6 @@ const sessionService = new SessionService();
             next(error);
         }
     }
-
 }
 
 export const authController = new AuthController();
