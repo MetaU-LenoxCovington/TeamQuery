@@ -48,6 +48,17 @@ const sessionService = new SessionService();
         }
     }
 
+
+    // POST /api/auth/logout-all
+    async logoutAll(req: Request, res: Response, next: NextFunction) {
+        try {
+            const result = await authService.logoutAll(req.user!.userId, req.user!.organizationId);
+            res.json({message: 'Logged out from all sessions'});
+        } catch (error) {
+            next(error);
+        }
+    }
+
 }
 
 export const authController = new AuthController();
