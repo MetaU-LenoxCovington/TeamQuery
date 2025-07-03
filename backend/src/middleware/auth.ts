@@ -1,9 +1,8 @@
 import { Request, Response, NextFunction } from 'express';
 import { JWTUtils } from '../utils/jwt';
 import { AuthError } from '../utils/errors';
+import { PermissionError } from '../utils/errors';
 import { SessionService } from '../services/sessionService';
-import { AuthService } from '../services/authService';
-import { Session } from 'inspector/promises';
 
 export const authenticateToken = (sessionService: SessionService) => {
     return (req: Request, res: Response, next: NextFunction) => {
@@ -32,5 +31,19 @@ export const authenticateToken = (sessionService: SessionService) => {
             }
             throw AuthError.tokenInvalid();
         }
+    };
+};
+
+export const requireRole = (roles: string[]) => {
+    return (req: Request, res: Response, next: NextFunction) => {
+        if (!req.user) {
+            throw AuthError.tokenMissing();
+        }
+
+        if (!roles.includes(req.user.role)) {
+            throw PermissionError.insufficientPermissions();
+        }
+
+        next();
     };
 };
