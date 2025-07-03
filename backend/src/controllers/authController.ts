@@ -37,6 +37,17 @@ const sessionService = new SessionService();
         }
     }
 
+    // POST /api/auth/logout
+    async logout(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { refreshToken } = req.body;
+            await authService.logout(refreshToken);
+            res.json({message: 'Logged out successfully'});
+        } catch (error) {
+            next(error);
+        }
+    }
+
 }
 
 export const authController = new AuthController();
