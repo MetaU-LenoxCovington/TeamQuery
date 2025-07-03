@@ -145,4 +145,22 @@ export class PermissionService {
         return permissions.canUpload;
     }
 
+    async canDeleteDocument(userId: string, documentId: string): Promise<boolean> {
+        const document = await prisma.document.findUnique({
+            where: { id: documentId }
+        });
+
+        if (!document) {
+            return false;
+        }
+
+        const permissions = await this.getUserPermissions(userId, document.organizationId);
+        return permissions.canDelete || permissions.isAdmin;
+    }
+
+    async canManageUsers(userId: string, organizationId: string): Promise<boolean> {
+        const permissions = await this.getUserPermissions(userId, organizationId);
+        return permissions.canManageUsers || permissions.isAdmin;
+    }
+
 }
