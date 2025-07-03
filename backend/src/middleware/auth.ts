@@ -47,3 +47,15 @@ export const requireRole = (roles: string[]) => {
         next();
     };
 };
+
+export const requireAdmin =  (req: Request, res: Response, next: NextFunction) => {
+    if (!req.user) {
+        throw AuthError.tokenMissing();
+    }
+
+    if (!req.user.isAdmin) {
+        throw PermissionError.adminRequired();
+    }
+
+    next();
+};
