@@ -15,7 +15,22 @@ export class SearchIndexManager extends EventEmitter {
     private indexes = new Map<string, OrganizationIndex>();
     private buildingPromises = new Map<string, Promise<void>>();
 
-    private async buildIndex(organizationId: string): Promise<void> {
+    async buildIndex(organizationId: string): Promise<void> {
+        if(this.buildingPromises.has(organizationId)) {
+            return this.buildingPromises.get(organizationId)!;
+        }
+
+        const buildPromise = this.buildIndexInternal(organizationId);
+        this.buildingPromises.set(organizationId, buildPromise);
+
+        try {
+            await buildPromise;
+        } finally {
+            this.buildingPromises.delete(organizationId)
+        }
+    }
+
+    private async buildIndexInternal(organizationId: string): Promise<void> {
 
         const organization = await prisma.organization.findUnique({
             where: { id: organizationId },
