@@ -140,4 +140,9 @@ export class PermissionService {
         }
     }
 
+    async canUploadDocuments(userId: string, organizationId: string): Promise<boolean> {
+        const permissions = await this.getUserPermissions(userId, organizationId);
+        return permissions.canUpload;
+    }
+
 }
