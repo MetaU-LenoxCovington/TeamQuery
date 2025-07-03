@@ -1,14 +1,12 @@
 import { Request, Response, NextFunction } from 'express';
 import { SessionService } from '../services/sessionService';
 
-export const updateSessionActivity = (sessionService: SessionService) => {
-    return (req: Request, res: Response, next: NextFunction) => {
-        const sesionId = req.user?.sessionId;
+const sessionService = new SessionService();
 
-        if (sesionId) {
-            sessionService.updateSessionActivity(sesionId);
-        }
+export const updateSessionActivity = (req: Request, res: Response, next: NextFunction) => {
+    if (req.user?.sessionId) {
+        sessionService.updateSessionActivity(req.user.sessionId);
+    }
 
-        next();
-    };
+    next();
 };
