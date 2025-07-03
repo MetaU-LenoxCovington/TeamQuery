@@ -59,6 +59,18 @@ const sessionService = new SessionService();
         }
     }
 
+    // GET /api/auth/me
+    async getMe(req: Request, res: Response, next: NextFunction) {
+        try {
+            res.json({
+                user: req.user,
+                sessionActive: true,
+            });
+        } catch (error) {
+            next(error);
+        }
+    }
+
 }
 
 export const authController = new AuthController();
