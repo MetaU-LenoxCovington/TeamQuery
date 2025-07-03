@@ -70,7 +70,6 @@ model User {
   adminOrganizations Organization[] @relation("AdminOrganizations")
   auditLogs          AuditLog[]
   searchQueries      SearchQuery[]
-  documentAccesses   DocumentAccess[]
   refreshTokens      RefreshToken[]
   sessions           UserSession[]
 
@@ -187,7 +186,7 @@ model Document {
   folderId      String?
 
   accessLevel AccessLevel @default(GROUP)
-  restrictedToUsers String[]? // If accessLevel == RESTRICTED, list of user IDs
+  restrictedToUsers String[] // If accessLevel == RESTRICTED, list of user IDs
 
   organization  Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   group         Group? @relation(fields: [groupId], references: [id], onDelete: SetNull)
