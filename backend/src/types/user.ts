@@ -1,4 +1,4 @@
-import { MembershipRole, MembershipStatus } from '../../generated/prisma';
+import { MembershipRole } from '../../generated/prisma';
 
 export interface UserProfile {
   id: string;
@@ -16,7 +16,6 @@ export interface UserWithMemberships {
     id: string;
     name: string;
     role: MembershipRole;
-    status: MembershipStatus;
   }[];
 }
 
@@ -34,7 +33,6 @@ export interface OrganizationMember {
   email: string;
   name: string;
   role: MembershipRole;
-  status: MembershipStatus;
   permissionsGroupId?: string;
   permissionsGroupName?: string;
   joinedAt: Date;
@@ -53,7 +51,6 @@ export interface InviteUserResponse {
 
 export interface UpdateMemberRequest {
   role?: MembershipRole;
-  status?: MembershipStatus;
   permissionsGroupId?: string;
 }
 

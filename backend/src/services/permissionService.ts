@@ -1,6 +1,6 @@
 import { prisma }  from '../lib/prisma';
 import { PermissionError } from '../utils/errors';
-import { MembershipRole, AccessLevel } from '@prisma/client';
+import { MembershipRole, AccessLevel } from '../../generated/prisma';
 
 export class PermissionService {
 
@@ -12,7 +12,7 @@ export class PermissionService {
                     organizationId,
                 }
             },
-            inlcude: {
+            include: {
                 user: {
                     include: {
                         groupMemberships: {
@@ -36,7 +36,7 @@ export class PermissionService {
 
         return {
             role: membership.role,
-            canUpload: membership.canUplad,
+            canUpload: membership.canUpload,
             canDelete: membership.canDelete,
             canManageUsers: membership.canManageUsers,
             isAdmin: membership.role === MembershipRole.ADMIN,
@@ -74,9 +74,9 @@ export class PermissionService {
                 accessLevel: AccessLevel.RESTRICTED,
                 restrictedToUsers: { has: userId }
             }
-        ];
+        ] as any;
 
-        if (permissions.role === 'MANAGER' || permissions.role === 'ADMIN') {
+        if (permissions.role === MembershipRole.MANAGER || permissions.role === MembershipRole.ADMIN) {
             accessConditions.push({
                 accessLevel: AccessLevel.MANAGERS
             });
@@ -93,6 +93,51 @@ export class PermissionService {
 
         return documents.map( (d: any) => d.id);
 
+    }
+
+    async canAccessDocument(userId: string, documentId: string): Promise<boolean> {
+        const document = await prisma.document.findUnique({
+            where: { id: documentId },
+            include: {
+                group: true,
+            }
+        });
+
+        if (!document || document.isDeleted) {
+            return false;
+        }
+
+        const permissions = await this.getUserPermissions(userId, document.organizationId);
+
+        if (permissions.isAdmin) {
+            return true;
+        }
+
+        switch (document.accessLevel) {
+            case AccessLevel.PUBLIC:
+                return true;
+
+            case AccessLevel.GROUP:
+                if (!document.groupId) return false;
+                return permissions.groups.some( (group: any) =>
+                group.id === document.groupId);
+
+            case AccessLevel.MANAGERS:
+                return permissions.role === MembershipRole.MANAGER || permissions.role === MembershipRole.ADMIN;
+
+            case AccessLevel.ADMINS:
+                return permissions.isAdmin;
+
+            case AccessLevel.RESTRICTED:
+                if ( document.restrictedToUsers.includes(userId) || permissions.isAdmin){
+                    return true;
+                }else{
+                    return false;
+                }
+
+            default:
+                return false;
+        }
     }
 
 }
