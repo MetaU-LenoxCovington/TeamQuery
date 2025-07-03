@@ -1,0 +1,22 @@
+import { Request, Response, NextFunction } from 'express';
+import { AuthService } from '../services/authService';
+import { SessionService } from '../services/sessionService';
+
+const sessionService = new SessionService();
+ const authService = new AuthService(sessionService);
+
+ export class AuthController {
+
+    // POST /api/auth/register
+    async register(req: Request, res: Response, next: NextFunction) {
+        try {
+            const result = await authService.register(req.body);
+            res.status(201).json(result);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+}
+
+export const authController = new AuthController();
