@@ -92,4 +92,10 @@ export class SearchIndexManager extends EventEmitter {
             this.emit('indexDestroyed', organizationId);
         }
     }
+
+    getIndex(organizationId: string): OrganizationIndex | undefined {
+        return this.indexes.get(organizationId);
+    }
+
+
 }
