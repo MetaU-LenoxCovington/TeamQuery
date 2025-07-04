@@ -97,5 +97,10 @@ export class SearchIndexManager extends EventEmitter {
         return this.indexes.get(organizationId);
     }
 
+    hasIndex(organizationId: string): boolean {
+        return this.indexes.has(organizationId);
+    }
+
+
 
 }
