@@ -64,10 +64,10 @@ export class AuthService {
 						canManageUsers: true,
 					}
 				});
+			}
 
-		return {user, organization};
-
-	}});
+			return {user, organization};
+		});
 
 		return {
 			message: 'User registered successfully',
@@ -85,7 +85,7 @@ export class AuthService {
 			include: {
 				memberships: {
 					where: { organizationId: data.organizationId },
-					innclude: {
+					include: {
 						organization: true,
 					}
 				}
