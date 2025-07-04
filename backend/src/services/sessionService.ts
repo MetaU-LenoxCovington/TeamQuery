@@ -46,7 +46,7 @@ export class SessionService extends EventEmitter {
 			orgSessions.add(sessionId);
 		}
 
-		await prisma.session.create({
+		await prisma.userSession.create({
 			data: {
 				id: sessionId,
 				userId,
