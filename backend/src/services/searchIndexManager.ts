@@ -84,4 +84,12 @@ export class SearchIndexManager extends EventEmitter {
             throw error;
         }
     }
+
+    destroyIndex(organizationId: string): void {
+        if(this.indexes.has(organizationId)) {
+            logger.info(`Destroying index for ${organizationId}`);
+            this.indexes.delete(organizationId);
+            this.emit('indexDestroyed', organizationId);
+        }
+    }
 }
