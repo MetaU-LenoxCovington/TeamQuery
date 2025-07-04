@@ -101,6 +101,10 @@ export class SearchIndexManager extends EventEmitter {
         return this.indexes.has(organizationId);
     }
 
+    getActiveIndexes(): string[] {
+        return Array.from(this.indexes.keys());
+    }
+
 
 
 }
