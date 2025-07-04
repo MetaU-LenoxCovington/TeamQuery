@@ -8,11 +8,11 @@ export const errorHandler = (
   req: Request,
   res: Response,
   next: NextFunction
-) => {
+): void => {
 
   // handle custom errors
   if (error instanceof BaseError) {
-    return res.status(error.statusCode).json({
+    res.status(error.statusCode).json({
       success: false,
       error: {
         name: error.name,
@@ -25,13 +25,14 @@ export const errorHandler = (
         }),
       },
     });
+    return;
   }
 
   if (error.name === 'PrismaClientKnownRequestError') {
     const prismaError = error as any;
 
     if (prismaError.code === 'P2002') {
-      return res.status(409).json({
+      res.status(409).json({
         success: false,
         error: {
           name: 'ConflictError',
@@ -40,10 +41,11 @@ export const errorHandler = (
           timestamp: new Date().toISOString(),
         },
       });
+      return;
     }
 
     if (prismaError.code === 'P2025') {
-      return res.status(404).json({
+      res.status(404).json({
         success: false,
         error: {
           name: 'NotFoundError',
@@ -52,27 +54,30 @@ export const errorHandler = (
           timestamp: new Date().toISOString(),
         },
       });
+      return;
     }
   }
 
   if (error.name === 'JsonWebTokenError') {
     const authError = AuthError.tokenInvalid('Invalid token format');
-    return res.status(authError.statusCode).json({
+    res.status(authError.statusCode).json({
       success: false,
       error: authError.toJSON(),
     });
+    return;
   }
 
   if (error.name === 'TokenExpiredError') {
     const authError = AuthError.tokenExpired();
-    return res.status(authError.statusCode).json({
+    res.status(authError.statusCode).json({
       success: false,
       error: authError.toJSON(),
     });
+    return;
   }
 
   if (error.name === 'ValidationError' && !(error instanceof ValidationError)) {
-    return res.status(400).json({
+    res.status(400).json({
       success: false,
       error: {
         name: 'ValidationError',
@@ -81,11 +86,12 @@ export const errorHandler = (
         timestamp: new Date().toISOString(),
       },
     });
+    return;
   }
 
   logger.error('Unexpected error:', error);
 
-  return res.status(500).json({
+  res.status(500).json({
     success: false,
     error: {
       name: 'InternalServerError',
