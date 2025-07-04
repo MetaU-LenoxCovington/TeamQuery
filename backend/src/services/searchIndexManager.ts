@@ -105,6 +105,7 @@ export class SearchIndexManager extends EventEmitter {
         return Array.from(this.indexes.keys());
     }
 
-
-
+    async search(organizationId: string, query: string, accessibleDocumentIds: string[]): Promise<any> {
+        // TODO: implement search to return documents/text chunks relevant to the query
+    }
 }
