@@ -1,7 +1,7 @@
 export interface AccessTokenPayload {
   userId: string;
   organizationId: string;
-  role: 'ADMIN' | 'MEMBER';
+  role: 'ADMIN' | 'MEMBER' | 'MANAGER' | 'VIEWER';
   permissionsGroupId?: string;
   isAdmin: boolean;
   email: string;
@@ -47,7 +47,7 @@ export interface LoginResponse {
     email: string;
     name: string;
     organizationId: string;
-    role: 'ADMIN' | 'MEMBER';
+    role: 'ADMIN' | 'MEMBER' | 'MANAGER' | 'VIEWER';
     isAdmin: boolean;
   };
 }
@@ -64,7 +64,7 @@ export interface RefreshResponse {
 export interface AuthenticatedUser {
   userId: string;
   organizationId: string;
-  role: 'ADMIN' | 'MEMBER';
+  role: 'ADMIN' | 'MEMBER' | 'MANAGER' | 'VIEWER';
   permissionsGroupId?: string;
   isAdmin: boolean;
   email: string;
