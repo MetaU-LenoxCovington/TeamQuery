@@ -51,7 +51,7 @@ const sessionService = new SessionService();
     // POST /api/auth/logout-all
     async logoutAll(req: Request, res: Response, next: NextFunction) {
         try {
-            const result = await authService.logoutAll(req.user!.userId, req.user!.organizationId);
+            await authService.logoutAll(req.user!.userId, req.user!.organizationId);
             res.json({message: 'Logged out from all sessions'});
         } catch (error) {
             next(error);
@@ -65,6 +65,24 @@ const sessionService = new SessionService();
                 user: req.user,
                 sessionActive: true,
             });
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    // GET /api/auth/organizations
+    async getUserOrganizations(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { email } = req.query;
+
+            if (!email || typeof email !== 'string') {
+                const error = new Error('Email parameter is required');
+                (error as any).statusCode = 400;
+                throw error;
+            }
+
+            const user = await authService.getUserOrganizations(email);
+            res.json({ organizations: user });
         } catch (error) {
             next(error);
         }

@@ -9,6 +9,7 @@ const createAuthRoutes = (sessionService: any) => {
     router.post('/login', authController.login);
     router.post('/refresh', authController.refresh);
     router.post('/logout', authController.logout);
+    router.get('/organizations', authController.getUserOrganizations);
 
     router.post('/logout-all', authenticateToken(sessionService), requireAdmin, authController.logoutAll);
     router.get('/me', authenticateToken(sessionService), authController.getMe);
