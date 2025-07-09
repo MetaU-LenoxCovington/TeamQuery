@@ -4,6 +4,7 @@ import { JWTUtils } from '../utils/jwt';
 import { AuthError, ValidationError } from '../utils/errors';
 import { SessionService } from './sessionService';
 import { logger }	from '../utils/logger';
+import crypto from 'crypto';
 import {
   RegisterRequest,
   RegisterResponse,
@@ -45,7 +46,9 @@ export class AuthService {
 				}
 			});
 
-			let organization;
+			let organization = null;
+			let membership = null;
+
 			if ( data.organizationName ) {
 				organization = await tx.organization.create({
 					data: {
@@ -54,7 +57,7 @@ export class AuthService {
 					}
 				});
 
-				await tx.organizationMembership.create({
+				membership = await tx.organizationMembership.create({
 					data: {
 						userId: user.id,
 						organizationId: organization.id,
@@ -66,25 +69,74 @@ export class AuthService {
 				});
 			}
 
-			return {user, organization};
+			return { user, organization, membership };
+		});
+
+		const { user, organization, membership } = result;
+
+		// If no organization was created, throw an error
+		if (!organization || !membership) {
+			throw new AuthError('Organization creation failed');
+		}
+
+		// Create session for the organization
+		const sessionId = await this.sessionService.createSession(user.id, organization.id);
+
+		// Create refresh token
+		const refreshTokenRecord = await prisma.refreshToken.create({
+			data: {
+				token: crypto.randomUUID(),
+				userId: user.id,
+				organizationId: organization.id,
+				expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 7), // 7 days
+			}
+		});
+
+		// Generate tokens
+		const accessToken = JWTUtils.generateAccessToken({
+			userId: user.id,
+			organizationId: organization.id,
+			role: membership.role,
+			isAdmin: membership.role === 'ADMIN',
+			email: user.email,
+			name: user.name,
+			sessionId: sessionId
+		});
+
+		const refreshToken = JWTUtils.generateRefreshToken({
+			userId: user.id,
+			organizationId: organization.id,
+			tokenId: refreshTokenRecord.id,
+			sessionId: sessionId,
 		});
 
 		return {
-			message: 'User registered successfully',
-			userId: result.user.id,
+			accessToken,
+			refreshToken,
+			user: {
+				id: user.id,
+				email: user.email,
+				name: user.name,
+				organizations: [{
+					id: organization.id,
+					name: organization.name,
+					role: membership.role,
+					isAdmin: membership.role === 'ADMIN',
+				}],
+			},
+			defaultOrganizationId: organization.id,
 		};
 	}
 
 	async login( data: LoginRequest ): Promise<LoginResponse> {
-		if ( !data.email || !data.password || !data.organizationId) {
-			throw ValidationError.missingField('email, password, or organizationId is missing');
+		if ( !data.email || !data.password ) {
+			throw ValidationError.missingField('email or password is missing');
 		}
 
 		const user = await prisma.user.findUnique({
 			where: { email: data.email },
 			include: {
 				memberships: {
-					where: { organizationId: data.organizationId },
 					include: {
 						organization: true,
 					}
@@ -101,51 +153,63 @@ export class AuthService {
 			throw AuthError.invalidCredentials();
 		}
 
-		const membership = user.memberships[0];
-		if (!membership) {
-			throw new AuthError('User is not a member of the organization');
+		if (user.memberships.length === 0) {
+			throw new AuthError('User is not a member of any organization');
 		}
 
-		const sessionId = await this.sessionService.createSession(user.id, data.organizationId);
+		// Create sessions for all organizations the user belongs to
+		const sessionPromises = user.memberships.map(membership =>
+			this.sessionService.createSession(user.id, membership.organizationId)
+		);
+		const sessionIds = await Promise.all(sessionPromises);
+
+		// Use the first organization as default
+		// TODO: Add logic to select default organization based on user preferences
+		// TODO: Allow user to switch between organizations
+		const defaultOrganization = user.memberships[0];
+		const defaultSessionId = sessionIds[0];
 
 		const refreshTokenRecord = await prisma.refreshToken.create({
 			data: {
 				token: crypto.randomUUID(),
 				userId: user.id,
-				organizationId: data.organizationId,
+				organizationId: defaultOrganization.organizationId,
 				expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 7), // 7 days
 			}
 		});
 
 		const accessToken = JWTUtils.generateAccessToken({
 			userId: user.id,
-			organizationId: data.organizationId,
-			role: membership.role,
-			isAdmin: membership.role === 'ADMIN',
+			organizationId: defaultOrganization.organizationId,
+			role: defaultOrganization.role,
+			isAdmin: defaultOrganization.role === 'ADMIN',
 			email: user.email,
 			name: user.name,
-			sessionId
+			sessionId: defaultSessionId
 		});
 
 		const refreshToken = JWTUtils.generateRefreshToken({
 			userId: user.id,
-			organizationId: data.organizationId,
+			organizationId: defaultOrganization.organizationId,
 			tokenId: refreshTokenRecord.id,
-			sessionId,
+			sessionId: defaultSessionId,
 		});
 
 		return {
 			accessToken,
 			refreshToken,
-			sessionId,
 			user: {
 				id: user.id,
 				email: user.email,
 				name: user.name,
-				organizationId: data.organizationId,
-				role: membership.role,
-				isAdmin: membership.role === 'ADMIN',
-			}
+				organizations: user.memberships.map(membership => ({
+					id: membership.organizationId,
+					name: membership.organization.name,
+					role: membership.role,
+					isAdmin: membership.role === 'ADMIN',
+				})),
+			},
+			defaultOrganizationId: defaultOrganization.organizationId,
 		};
 	}
 
@@ -264,6 +328,28 @@ export class AuthService {
 		for (const session of sessions) {
 			await this.sessionService.destroySession(session.id);
 		}
+	}
+
+	async getUserOrganizations(email: string): Promise<Array<{id: string, name: string}>> {
+		const user = await prisma.user.findUnique({
+			where: { email },
+			include: {
+				memberships: {
+					include: {
+						organization: true,
+					}
+				}
+			}
+		});
+
+		if (!user) {
+			return [];
+		}
+
+		return user.memberships.map(membership => ({
+			id: membership.organizationId,
+			name: membership.organization.name,
+		}));
 	}
 
 	private isValidEmail(email: string): boolean {
