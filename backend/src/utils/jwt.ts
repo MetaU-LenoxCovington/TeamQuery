@@ -5,8 +5,10 @@ import { AuthError } from './errors';
 export class JWTUtils {
   private static ACCESS_SECRET = process.env.JWT_ACCESS_SECRET;
   private static REFRESH_SECRET = process.env.JWT_REFRESH_SECRET;
-  private static ACCESS_EXPIRES_IN = process.env.ACCESS_TOKEN_EXPIRES_IN || '30m';
-  private static REFRESH_EXPIRES_IN = process.env.REFRESH_TOKEN_EXPIRES_IN || '7d';
+  private static ACCESS_EXPIRES_IN =
+    process.env.ACCESS_TOKEN_EXPIRES_IN || '30m';
+  private static REFRESH_EXPIRES_IN =
+    process.env.REFRESH_TOKEN_EXPIRES_IN || '7d';
 
   static {
     if (!this.ACCESS_SECRET || !this.REFRESH_SECRET) {
@@ -14,13 +16,17 @@ export class JWTUtils {
     }
   }
 
-  static generateAccessToken(payload: Omit<AccessTokenPayload, 'iat' | 'exp'>): string {
+  static generateAccessToken(
+    payload: Omit<AccessTokenPayload, 'iat' | 'exp'>
+  ): string {
     return jwt.sign(payload, this.ACCESS_SECRET!, {
       expiresIn: this.ACCESS_EXPIRES_IN,
     } as any);
   }
 
-  static generateRefreshToken(payload: Omit<RefreshTokenPayload, 'iat' | 'exp'>): string {
+  static generateRefreshToken(
+    payload: Omit<RefreshTokenPayload, 'iat' | 'exp'>
+  ): string {
     return jwt.sign(payload, this.REFRESH_SECRET!, {
       expiresIn: this.REFRESH_EXPIRES_IN,
     } as any);

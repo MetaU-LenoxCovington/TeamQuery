@@ -17,12 +17,16 @@ const permissionService = new PermissionService();
 
 // Connect session events to index management
 sessionService.on('organizationFirstLogin', (organizationId: string) => {
-  console.log(`First login for organization ${organizationId} - building search index`);
+  console.log(
+    `First login for organization ${organizationId} - building search index`
+  );
   searchIndexManager.buildIndex(organizationId).catch(console.error);
 });
 
 sessionService.on('organizationLastLogout', (organizationId: string) => {
-  console.log(`Last logout for organization ${organizationId} - destroying search index`);
+  console.log(
+    `Last logout for organization ${organizationId} - destroying search index`
+  );
   searchIndexManager.destroyIndex(organizationId);
 });
 

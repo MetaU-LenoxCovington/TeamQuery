@@ -2,14 +2,12 @@ import { Request, Response, NextFunction } from 'express';
 import { BaseError, AuthError, ValidationError } from '../utils/errors';
 import { logger } from '../utils/logger';
 
-
 export const errorHandler = (
   error: Error,
   req: Request,
   res: Response,
   next: NextFunction
 ): void => {
-
   // handle custom errors
   if (error instanceof BaseError) {
     res.status(error.statusCode).json({

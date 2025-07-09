@@ -10,7 +10,10 @@ export class PasswordUtils {
     });
   }
 
-  static async verify(hashedPassword: string, plainPassword: string): Promise<boolean> {
+  static async verify(
+    hashedPassword: string,
+    plainPassword: string
+  ): Promise<boolean> {
     try {
       return await argon2.verify(hashedPassword, plainPassword);
     } catch (error) {
