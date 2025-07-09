@@ -28,28 +28,42 @@ export interface RegisterRequest {
 }
 
 export interface RegisterResponse {
-  message: string;
-  userId?: string;
+  accessToken: string;
+  refreshToken: string;
+  user: {
+    id: string;
+    email: string;
+    name: string;
+    organizations: Array<{
+      id: string;
+      name: string;
+      role: 'ADMIN' | 'MEMBER' | 'MANAGER' | 'VIEWER';
+      isAdmin: boolean;
+    }>;
+  };
+  defaultOrganizationId: string;
 }
 
 export interface LoginRequest {
   email: string;
   password: string;
-  organizationId: string;
 }
 
 export interface LoginResponse {
   accessToken: string;
   refreshToken: string;
-  sessionId: string;
   user: {
     id: string;
     email: string;
     name: string;
-    organizationId: string;
-    role: 'ADMIN' | 'MEMBER' | 'MANAGER' | 'VIEWER';
-    isAdmin: boolean;
+    organizations: Array<{
+      id: string;
+      name: string;
+      role: 'ADMIN' | 'MEMBER' | 'MANAGER' | 'VIEWER';
+      isAdmin: boolean;
+    }>;
   };
+  defaultOrganizationId: string;
 }
 
 export interface RefreshRequest {
