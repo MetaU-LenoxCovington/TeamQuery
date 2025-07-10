@@ -1,9 +1,8 @@
 import { Request, Response, NextFunction } from 'express';
 import { AuthService } from '../services/authService';
-import { SessionService } from '../services/sessionService';
+import { sessionService } from '../services/sessionServiceSingleton';
 
-const sessionService = new SessionService();
- const authService = new AuthService(sessionService);
+const authService = new AuthService(sessionService);
 
  export class AuthController {
 
@@ -58,17 +57,26 @@ const sessionService = new SessionService();
         }
     }
 
-    // GET /api/auth/me
-    async getMe(req: Request, res: Response, next: NextFunction) {
-        try {
-            res.json({
-                user: req.user,
-                sessionActive: true,
-            });
-        } catch (error) {
-            next(error);
-        }
+  // GET /api/auth/me
+  async getMe(req: Request, res: Response, next: NextFunction) {
+    try {
+      const userData = await authService.getUserWithOrganizations(
+        req.user!.userId
+      );
+
+      res.json({
+        user: {
+          id: userData.id,
+          name: userData.name,
+          email: userData.email,
+          organizations: userData.organizations,
+        },
+        sessionActive: true,
+      });
+    } catch (error) {
+      next(error);
     }
+  }
 
     // GET /api/auth/organizations
     async getUserOrganizations(req: Request, res: Response, next: NextFunction) {
