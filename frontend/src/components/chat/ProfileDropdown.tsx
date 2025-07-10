@@ -6,7 +6,7 @@ interface ProfileDropdownProps {
   isOpen: boolean;
   onToggle: () => void;
 }
-
+// TODO: change to make the buttons actually functional and route to the other pages once they are made
 export const ProfileDropdown: React.FC<ProfileDropdownProps> = ({ user, isOpen, onToggle }) => (
   <div className={chatStyles.chatHeader.profileDropdown.container}>
     <button
