@@ -346,11 +346,40 @@ export class AuthService {
 			return [];
 		}
 
-		return user.memberships.map(membership => ({
-			id: membership.organizationId,
-			name: membership.organization.name,
-		}));
-	}
+    return user.memberships.map(membership => ({
+      id: membership.organizationId,
+      name: membership.organization.name,
+    }));
+  }
+
+  async getUserWithOrganizations(userId: string) {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      include: {
+        memberships: {
+          include: {
+            organization: true,
+          },
+        },
+      },
+    });
+
+    if (!user) {
+      throw new AuthError('User not found');
+    }
+
+    return {
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      organizations: user.memberships.map(membership => ({
+        id: membership.organizationId,
+        name: membership.organization.name,
+        role: membership.role,
+        isAdmin: membership.role === 'ADMIN',
+      })),
+    };
+  }
 
 	private isValidEmail(email: string): boolean {
 		const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;

@@ -2,8 +2,8 @@ import { Router } from "express";
 import { authController } from "../controllers/authController";
 import { authenticateToken, requireAdmin } from "../middleware/auth";
 
-const createAuthRoutes = (sessionService: any) => {
-    const router = Router();
+const createAuthRoutes = () => {
+  const router = Router();
 
     router.post('/register', authController.register);
     router.post('/login', authController.login);
@@ -11,8 +11,13 @@ const createAuthRoutes = (sessionService: any) => {
     router.post('/logout', authController.logout);
     router.get('/organizations', authController.getUserOrganizations);
 
-    router.post('/logout-all', authenticateToken(sessionService), requireAdmin, authController.logoutAll);
-    router.get('/me', authenticateToken(sessionService), authController.getMe);
+  router.post(
+    '/logout-all',
+    authenticateToken,
+    requireAdmin,
+    authController.logoutAll
+  );
+  router.get('/me', authenticateToken, authController.getMe);
 
     return router;
 };
