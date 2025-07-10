@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { LoginForm } from './LoginForm';
 import { SignupForm } from './SignupForm';
-import { useAuth } from '../../hooks/useAuth';
+import { useAuthContext } from '../../contexts/AuthContext';
 import { LoginRequest, SignupRequest } from '../../services/authService';
 import { COLORS } from '../../styles/colors';
 import { TYPOGRAPHY_STYLES } from '../../styles/typographyStyles';
@@ -9,21 +10,20 @@ import { TYPOGRAPHY_STYLES } from '../../styles/typographyStyles';
 type AuthMode = 'login' | 'signup';
 
 interface AuthPageProps {
-  onAuthSuccess: (user: any, token: string) => void;
   initialMode?: AuthMode;
 }
 
 export const AuthPage: React.FC<AuthPageProps> = ({
-  onAuthSuccess,
   initialMode = 'login',
 }) => {
   const [mode, setMode] = useState<AuthMode>(initialMode);
-  const { login, signup, loading, error, clearError } = useAuth();
+  const { login, signup, isLoading, error, clearError } = useAuthContext();
+  const router = useRouter();
 
   const handleLogin = async (data: LoginRequest) => {
     try {
-      const response = await login(data);
-      onAuthSuccess(response.user, response.accessToken);
+      await login(data.email, data.password);
+      router.push('/chat');
     } catch (err) {
       console.error('Login failed:', err);
     }
@@ -31,8 +31,8 @@ export const AuthPage: React.FC<AuthPageProps> = ({
 
   const handleSignup = async (data: SignupRequest) => {
     try {
-      const response = await signup(data);
-      onAuthSuccess(response.user, response.accessToken);
+      await signup(data);
+      router.push('/chat');
     } catch (err) {
       console.error('Signup failed:', err);
     }
@@ -78,14 +78,14 @@ export const AuthPage: React.FC<AuthPageProps> = ({
             <LoginForm
               onSubmit={handleLogin}
               onSwitchToSignup={switchToSignup}
-              loading={loading}
+              loading={isLoading}
               error={error || undefined}
             />
           ) : (
             <SignupForm
               onSubmit={handleSignup}
               onSwitchToLogin={switchToLogin}
-              loading={loading}
+              loading={isLoading}
               error={error || undefined}
             />
           )}
