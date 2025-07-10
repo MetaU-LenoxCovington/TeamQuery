@@ -46,14 +46,23 @@ export class SessionService extends EventEmitter {
 			orgSessions.add(sessionId);
 		}
 
-		await prisma.userSession.create({
-			data: {
-				id: sessionId,
-				userId,
-				organizationId,
-				expiresAt,
-			}
-		});
+    try {
+      await prisma.userSession.create({
+        data: {
+          id: sessionId,
+          userId,
+          organizationId,
+          expiresAt,
+        },
+      });
+    } catch (error) {
+      // Clean up in-memory session if database save fails
+      this.activeSessions.delete(sessionId);
+      if (orgSessions) {
+        orgSessions.delete(sessionId);
+      }
+      throw error;
+    }
 
 		return sessionId;
 	}
@@ -126,18 +135,19 @@ export class SessionService extends EventEmitter {
 
 			this.activeSessions.set(dbSession.id, session);
 
-			if (!this.organizationSessions.has(dbSession.organizationId)) {
-				this.organizationSessions.set(dbSession.organizationId, new Set());
+      if (!this.organizationSessions.has(dbSession.organizationId)) {
+        this.organizationSessions.set(dbSession.organizationId, new Set());
+        this.emit('organizationFirstLogin', dbSession.organizationId);
+      }
 
-				this.emit('organizationFirstLogin', dbSession.organizationId);
-
-				const orgSessions = this.organizationSessions.get(dbSession.organizationId);
-				if (orgSessions){
-					orgSessions.add(dbSession.id);
-				}
-			}
-		}
-	}
+      const orgSessions = this.organizationSessions.get(
+        dbSession.organizationId
+      );
+      if (orgSessions) {
+        orgSessions.add(dbSession.id);
+      }
+    }
+  }
 
 	private cleanupExpiredSessions(): void {
 		const now = new Date();
