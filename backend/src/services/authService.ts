@@ -54,6 +54,7 @@ export class AuthService {
 					data: {
 						name: data.organizationName,
 						adminUserId: user.id,
+						createdBy: user.id,
 					}
 				});
 
@@ -65,6 +66,15 @@ export class AuthService {
 						canUpload: true,
 						canDelete: true,
 						canManageUsers: true,
+					}
+				});
+
+				// Create default group
+				await tx.group.create({
+					data: {
+						name: 'General',
+						description: 'Default group for all members',
+						organizationId: organization.id,
 					}
 				});
 			}
