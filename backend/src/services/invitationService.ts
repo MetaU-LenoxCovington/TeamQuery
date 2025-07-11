@@ -15,8 +15,8 @@ export class InvitationService {
   ) {}
 
   async inviteUser(
-    inviterId: string, 
-    organizationId: string, 
+    inviterId: string,
+    organizationId: string,
     inviteData: InviteUserRequest
   ) {
 
@@ -25,10 +25,10 @@ export class InvitationService {
       throw new PermissionError('Cannot invite users');
     }
 
-    const targetUser = await prisma.user.findUnique({ 
-      where: { email: inviteData.email } 
+    const targetUser = await prisma.user.findUnique({
+      where: { email: inviteData.email }
     });
-    
+
     if (!targetUser) {
       throw new ValidationError('User with this email does not exist. They must create an account first.');
     }
@@ -158,7 +158,7 @@ export class InvitationService {
         email: user.email, // user can only accept their own invites
         status: 'PENDING'
       },
-      include: { 
+      include: {
         organization: {
           select: {
             id: true,
@@ -195,7 +195,7 @@ export class InvitationService {
         });
 
         const existingGroupIds = existingGroups.map(g => g.id);
-        
+
         await Promise.all(
           existingGroupIds.map(groupId =>
             tx.groupMembership.create({
@@ -213,7 +213,7 @@ export class InvitationService {
       // Mark invitation as accepted
       await tx.organizationInvite.update({
         where: { id: invitation.id },
-        data: { 
+        data: {
           status: 'ACCEPTED',
           updatedAt: new Date()
         }
@@ -234,14 +234,14 @@ export class InvitationService {
         status: 'PENDING'
       }
     });
-    
+
     if (!invitation) {
       throw new NotFoundError('Invitation not found or no longer valid');
     }
 
     await prisma.organizationInvite.update({
       where: { id: invitation.id },
-      data: { 
+      data: {
         status: 'DECLINED',
         updatedAt: new Date()
       }
@@ -258,7 +258,7 @@ export class InvitationService {
 
     // Check permissions
     const permissions = await this.permissionService.getUserPermissions(
-      inviterId, 
+      inviterId,
       invitation.organizationId
     );
     if (!permissions.canManageUsers && invitation.invitedBy !== inviterId) {
@@ -271,7 +271,7 @@ export class InvitationService {
 
     await prisma.organizationInvite.update({
       where: { id: invitationId },
-      data: { 
+      data: {
         status: 'CANCELLED',
         updatedAt: new Date()
       }
@@ -281,7 +281,7 @@ export class InvitationService {
   async resendInvitation(inviterId: string, invitationId: string) {
     const invitation = await prisma.organizationInvite.findUnique({
       where: { id: invitationId },
-      include: { 
+      include: {
         organization: {
           select: {
             id: true,
@@ -302,7 +302,7 @@ export class InvitationService {
     if (!invitation) throw new NotFoundError('Invitation not found');
 
     const permissions = await this.permissionService.getUserPermissions(
-      inviterId, 
+      inviterId,
       invitation.organizationId
     );
     if (!permissions.canManageUsers && invitation.invitedBy !== inviterId) {
@@ -337,86 +337,4 @@ export class InvitationService {
 
     return updatedInvitation;
   }
-
-  async sendInvitation(senderId: string, organizationId: string, inviteeEmail: string) {
-    // Check if sender has permission to invite
-    const senderMembership = await prisma.organizationMembership.findFirst({
-      where: {
-        organizationId,
-        userId: senderId,
-        organization: {
-          isActive: true  // Only work with active organizations
-        }
-      },
-      include: {
-        organization: true
-      }
-    });
-
-    if (!senderMembership || (senderMembership.role !== 'ADMIN' && senderMembership.role !== 'MANAGER')) {
-      throw new PermissionError('Insufficient permissions to send invitations');
-    }
-
-    // Check if invitee user exists
-    const invitee = await prisma.user.findUnique({
-      where: { email: inviteeEmail }
-    });
-
-    if (!invitee) {
-      throw new ValidationError('User with this email does not exist');
-    }
-
-    // Check if user is already a member
-    const existingMembership = await prisma.organizationMembership.findFirst({
-      where: {
-        organizationId,
-        userId: invitee.id
-      }
-    });
-
-    if (existingMembership) {
-      throw new ValidationError('User is already a member of this organization');
-    }
-
-    // Check for existing pending invitation
-    const existingInvitation = await prisma.organizationInvite.findFirst({
-      where: {
-        organizationId,
-        email: inviteeEmail,
-        status: 'PENDING'
-      }
-    });
-
-    if (existingInvitation) {
-      throw new ValidationError('Invitation already sent to this user');
-    }
-
-    // Create invitation - no member limit check
-    return await prisma.organizationInvite.create({
-      data: {
-        organizationId,
-        invitedBy: senderId,
-        email: inviteeEmail,
-        role: 'MEMBER', // Default role for invited users
-        groupIds: [], // No groups by default
-        status: 'PENDING'
-      },
-      include: {
-        organization: {
-          select: {
-            id: true,
-            name: true,
-            description: true
-          }
-        },
-        inviter: {
-          select: {
-            id: true,
-            name: true,
-            email: true
-          }
-        }
-      }
-    });
-  }
-} 
+}
