@@ -28,6 +28,6 @@ test_data
 *.njsproj
 *.sln
 *.sw?
-lib
+
 venv
 /src/generated/prisma
