@@ -32,6 +32,7 @@ enum AccessLevel {
 model Organization {
   id String @id @default(cuid())
   name String
+  description String?
   maxWords Int?
   currentWordCount Int @default(0)
   lastIndexUpdate DateTime?
@@ -39,6 +40,7 @@ model Organization {
 
   defaultDocumentAccess AccessLevel @default(GROUP)
   allowMemberUploads Boolean @default(true)
+  isActive Boolean @default(true)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -46,14 +48,20 @@ model Organization {
   adminUserId String
   adminUser User @relation("AdminOrganizations", fields: [adminUserId], references: [id])
 
+  createdBy String
+  creator User @relation("CreatedOrganizations", fields: [createdBy], references: [id])
+
   memberships       OrganizationMembership[]
   groups             Group[]
   documents         Document[]
   folders           Folder[]
   auditLogs         AuditLog[]
   searchQueries     SearchQuery[]
+  invitations       OrganizationInvite[]
 
   @@index([adminUserId])
+  @@index([createdBy])
+  @@index([isActive])
 }
 
 model User {
@@ -65,13 +73,15 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  memberships        OrganizationMembership[]
-  groupMemberships   GroupMembership[]
-  adminOrganizations Organization[] @relation("AdminOrganizations")
-  auditLogs          AuditLog[]
-  searchQueries      SearchQuery[]
-  refreshTokens      RefreshToken[]
-  sessions           UserSession[]
+  memberships          OrganizationMembership[]
+  groupMemberships     GroupMembership[]
+  adminOrganizations   Organization[] @relation("AdminOrganizations")
+  createdOrganizations Organization[] @relation("CreatedOrganizations")
+  sentInvitations      OrganizationInvite[] @relation("SentInvitations")
+  auditLogs            AuditLog[]
+  searchQueries        SearchQuery[]
+  refreshTokens        RefreshToken[]
+  sessions             UserSession[]
 
   @@index([email])
 }
@@ -81,6 +91,7 @@ model Group {
   name String
   description String?
   organizationId String
+  isDefault Boolean @default(false)
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   members      GroupMembership[]
@@ -92,27 +103,26 @@ model Group {
 
   @@unique([organizationId, name])
   @@index([organizationId])
+  @@index([isDefault])
 }
 
 model GroupMembership {
   id String @id @default(cuid())
   userId String
   groupId String
-  role GroupRole @default(MEMBER)
+
+  canUpload Boolean @default(true)
+  canDelete Boolean @default(false)
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   group Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
 
-  createdAt DateTime @default(now())
+  joinedAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@unique([userId, groupId])
   @@index([groupId])
   @@index([userId])
-}
-
-enum GroupRole {
-  ADMIN
-  MEMBER
 }
 
 model OrganizationMembership {
@@ -313,4 +323,31 @@ model UserSession {
   @@index([userId])
   @@index([organizationId])
   @@index([expiresAt])
+}
+
+model OrganizationInvite {
+  id             String @id @default(cuid())
+  email          String
+  organizationId String
+  invitedBy      String
+  role           MembershipRole
+  groupIds       String[] // Groups to add user to
+  status         InviteStatus @default(PENDING)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  inviter      User         @relation("SentInvitations", fields: [invitedBy], references: [id])
+
+  @@unique([email, organizationId]) // Can't invite same email twice to same org
+  @@index([email])
+  @@index([organizationId])
+  @@index([status])
+}
+
+enum InviteStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  CANCELLED
 }
