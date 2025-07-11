@@ -7,6 +7,9 @@ import { AuthService } from './services/authService';
 import { PermissionService } from './services/permissionService';
 import { updateSessionActivity } from './middleware/sessionActivity';
 import createAuthRoutes from './routes/auth';
+import createOrganizationRoutes from './routes/organizations';
+import createInvitationRoutes from './routes/invitations';
+import createGroupRoutes from './routes/groups';
 import { logger } from './utils/logger';
 
 const app = express();
@@ -41,6 +44,9 @@ app.locals.permissionService = permissionService;
 
 // Routes
 app.use('/api/auth', createAuthRoutes());
+app.use('/api/organizations', createOrganizationRoutes());
+app.use('/api/invitations', createInvitationRoutes());
+app.use('/api/organizations/:orgId/groups', createGroupRoutes());
 
 // Health check
 app.get('/health', (_req, res) => {
