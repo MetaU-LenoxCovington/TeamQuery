@@ -43,7 +43,8 @@ export class PermissionService {
             groups: membership.user.groupMemberships.map((membership: any) => ({
                 id: membership.group.id,
                 name: membership.group.name,
-                role: membership.role,
+                canUpload: membership.canUpload,
+                canDelete: membership.canDelete,
             })),
         };
     }
