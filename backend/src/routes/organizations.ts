@@ -27,4 +27,4 @@ const createOrganizationRoutes = () => {
   return router;
 };
 
-export default createOrganizationRoutes; 
+export default createOrganizationRoutes;
