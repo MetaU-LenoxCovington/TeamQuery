@@ -15,6 +15,8 @@ export const ERROR_CODES = {
 		INVALID_EMAIL: 1201,
 		MISSING_REQUIRED_FIELD: 1203,
 		INVALID_INPUT_FORMAT: 1204,
+
+		NOT_FOUND: 1301,
   };
 
 export abstract class BaseError extends Error {
@@ -108,6 +110,12 @@ export class PermissionError extends BaseError {
     return new PermissionError(message, ERROR_CODES.MEMBERSHIP_REQUIRED);
   }
 
+}
+
+export class NotFoundError extends BaseError {
+  constructor(message: string, code: number = ERROR_CODES.NOT_FOUND) {
+    super(message, code, 404);
+  }
 }
 
 export class ValidationError extends BaseError {
