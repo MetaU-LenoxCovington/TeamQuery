@@ -2,7 +2,6 @@ import { prisma } from '../lib/prisma';
 import { PermissionService } from './permissionService';
 import { SessionService } from './sessionService';
 import { ValidationError, PermissionError, NotFoundError } from '../utils/errors';
-import { PasswordUtils } from '../utils/password';
 import { MembershipRole } from '../../generated/prisma';
 
 export interface CreateOrganizationRequest {
@@ -25,13 +24,13 @@ export class OrganizationService {
   ) {}
 
   async createOrganization(userId: string, data: CreateOrganizationRequest) {
-    
+
     /*
     // TODO: Set some limit on the number of organizations a user can create
     const userOrgCount = await prisma.organizationMembership.count({
       where: { userId, organization: { isActive: true } }
     });
-    
+
     if (userOrgCount >= 10) {
       throw new ValidationError('Maximum organization limit reached (10)');
     }
@@ -74,11 +73,11 @@ export class OrganizationService {
   }
 
   async updateOrganization(
-    userId: string, 
-    organizationId: string, 
+    userId: string,
+    organizationId: string,
     data: UpdateOrganizationRequest
   ) {
-    
+
     const permissions = await this.permissionService.getUserPermissions(userId, organizationId);
     if (!permissions.isAdmin) {
       throw new PermissionError('Only administrators can update organization settings');
@@ -113,9 +112,9 @@ export class OrganizationService {
 
     // Verify organization exists and is active
     const organization = await prisma.organization.findFirst({
-      where: { 
+      where: {
         id: organizationId,
-        isActive: true 
+        isActive: true
       }
     });
 
@@ -141,7 +140,7 @@ export class OrganizationService {
 
   async getUserOrganizations(userId: string) {
     const memberships = await prisma.organizationMembership.findMany({
-      where: { 
+      where: {
         userId,
         organization: {
           isActive: true  // Only return active organizations
@@ -245,17 +244,17 @@ export class OrganizationService {
     // Can't change admin role without transferring ownership
     const org = await prisma.organization.findUnique({ where: { id: organizationId } });
     if (!org) throw new NotFoundError('Organization not found');
-    
+
     if (org.adminUserId === targetUserId && newRole !== 'ADMIN') {
       throw new ValidationError('Cannot change admin role. Transfer ownership first.');
     }
 
     const membership = await prisma.organizationMembership.update({
-      where: { 
-        userId_organizationId: { 
-          userId: targetUserId, 
-          organizationId 
-        } 
+      where: {
+        userId_organizationId: {
+          userId: targetUserId,
+          organizationId
+        }
       },
       data: {
         role: newRole,
@@ -284,7 +283,7 @@ export class OrganizationService {
     // Can't remove organization admin
     const org = await prisma.organization.findUnique({ where: { id: organizationId } });
     if (!org) throw new NotFoundError('Organization not found');
-    
+
     if (org.adminUserId === targetUserId) {
       throw new ValidationError('Cannot remove organization administrator. Transfer ownership first.');
     }
@@ -292,18 +291,18 @@ export class OrganizationService {
     await prisma.$transaction(async (tx: any) => {
       // Remove from all groups in this organization
       await tx.groupMembership.deleteMany({
-        where: { 
+        where: {
           userId: targetUserId,
           group: { organizationId }
         }
       });
 
       await tx.organizationMembership.delete({
-        where: { 
-          userId_organizationId: { 
-            userId: targetUserId, 
-            organizationId 
-          } 
+        where: {
+          userId_organizationId: {
+            userId: targetUserId,
+            organizationId
+          }
         }
       });
     });
@@ -312,8 +311,8 @@ export class OrganizationService {
   }
 
   async transferAdminRole(
-    currentAdminId: string, 
-    organizationId: string, 
+    currentAdminId: string,
+    organizationId: string,
     newAdminId: string
   ): Promise<void> {
     await prisma.$transaction(async (tx: any) => {
@@ -321,7 +320,7 @@ export class OrganizationService {
       const currentMembership = await tx.organizationMembership.findUnique({
         where: { userId_organizationId: { userId: currentAdminId, organizationId } }
       });
-      
+
       if (!currentMembership || currentMembership.role !== 'ADMIN') {
         throw new PermissionError('Only admin can transfer role');
       }
@@ -330,7 +329,7 @@ export class OrganizationService {
       const newMembership = await tx.organizationMembership.findUnique({
         where: { userId_organizationId: { userId: newAdminId, organizationId } }
       });
-      
+
       if (!newMembership) {
         throw new ValidationError('New admin must be organization member');
       }
@@ -343,7 +342,7 @@ export class OrganizationService {
 
       await tx.organizationMembership.update({
         where: { userId_organizationId: { userId: newAdminId, organizationId } },
-        data: { 
+        data: {
           role: 'ADMIN',
           canUpload: true,
           canDelete: true,
@@ -353,7 +352,7 @@ export class OrganizationService {
 
       await tx.organizationMembership.update({
         where: { userId_organizationId: { userId: currentAdminId, organizationId } },
-        data: { 
+        data: {
           role: 'MEMBER',
           canManageUsers: false,
           canDelete: false,
@@ -371,7 +370,7 @@ export class OrganizationService {
     if (!membership) {
       throw new NotFoundError('Not a member of this organization');
     }
-    
+
     // Can't leave if you're the admin (must transfer first)
     if (membership.organization.adminUserId === userId) {
       throw new ValidationError('Administrator must transfer role before leaving organization');
@@ -380,7 +379,7 @@ export class OrganizationService {
     await prisma.$transaction(async (tx: any) => {
       // Remove from all groups in this organization
       await tx.groupMembership.deleteMany({
-        where: { 
+        where: {
           userId,
           group: { organizationId }
         }
@@ -394,4 +393,4 @@ export class OrganizationService {
 
     // TODO: Might need to add clean up for user sessions for this organization
   }
-} 
+}
