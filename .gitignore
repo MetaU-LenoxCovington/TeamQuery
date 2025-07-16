@@ -31,3 +31,5 @@ test_data
 
 venv
 /src/generated/prisma
+
+pythonService/frequency_dictionary_en_82_765.txt
