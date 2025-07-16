@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 import uvicorn
 import logging
 from app.config import get_settings
+from app.routers import documents
 
 settings = get_settings()
 
@@ -40,6 +41,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.include_router(documents.router, prefix="/api/documents", tags=["documents"])
 
 @app.get("/")
 async def root():
