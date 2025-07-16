@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 import uvicorn
 import logging
 from app.config import get_settings
-from app.routers import documents
+from app.routers import documents, search
 
 settings = get_settings()
 
@@ -43,6 +43,7 @@ app.add_middleware(
 )
 
 app.include_router(documents.router, prefix="/api/documents", tags=["documents"])
+app.include_router(search.router, prefix="/api/search", tags=["search"])
 
 @app.get("/")
 async def root():
