@@ -2,6 +2,7 @@ from pydantic_settings import BaseSettings
 from pydantic import Field, validator
 from typing import List, Optional
 import os
+from functools import lru_cache
 
 
 class Settings(BaseSettings):
@@ -55,22 +56,9 @@ class Settings(BaseSettings):
         # Allow extra fields
         extra = "ignore"
 
-
-# Create global settings instance
-settings = Settings()
-
-
+@lru_cache
 def get_settings() -> Settings:
-    """
-    Get application settings instance
-
-    This function can be used as a FastAPI dependency:
-
-    @app.get("/config")
-    def get_config(settings: Settings = Depends(get_settings)):
-        return {"debug": settings.DEBUG}
-    """
-    return settings
+    return Settings()
 
 
 def reload_settings() -> Settings:
