@@ -1,8 +1,9 @@
-from pydantic_settings import BaseSettings
-from pydantic import Field, validator
-from typing import List, Optional
 import os
 from functools import lru_cache
+from typing import List, Optional
+
+from pydantic import Field, validator
+from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
@@ -15,15 +16,16 @@ class Settings(BaseSettings):
 
     # CORS CONFIGURATION
     ALLOWED_ORIGINS: str = Field(
-        default="http://localhost:3000",
-        description="Allowed CORS origins"
+        default="http://localhost:3000", description="Allowed CORS origins"
     )
 
     # DATABASE CONFIGURATION (Required from environment)
-    DATABASE_URL: str = Field(
-        ...,
-        description="Postgres DB connection URL"
-    )
+    DATABASE_URL: str = Field(..., description="Postgres DB connection URL")
+
+    # LLM Configuration
+    LLM_MODEL: str = "llama3:8b"
+    LLM_TEMPERATURE: float = 0.0
+    LLM_MAX_TOKENS: int = 16384
 
     # LOGGING CONFIGURATION
     LOG_LEVEL: str = Field(default="INFO", description="Logging level")
@@ -31,7 +33,11 @@ class Settings(BaseSettings):
     @property
     def ALLOWED_ORIGINS_LIST(self) -> List[str]:
         """Get CORS origins as a list"""
-        return [origin.strip() for origin in self.ALLOWED_ORIGINS.split(",") if origin.strip()]
+        return [
+            origin.strip()
+            for origin in self.ALLOWED_ORIGINS.split(",")
+            if origin.strip()
+        ]
 
     # VALIDATORS
     @validator("LOG_LEVEL")
@@ -46,7 +52,9 @@ class Settings(BaseSettings):
     def validate_database_url(cls, value):
         """Validate database URL format"""
         if not value.startswith(("postgresql://", "postgres://")):
-            raise ValueError("DATABASE_URL must be a valid PostgreSQL connection string")
+            raise ValueError(
+                "DATABASE_URL must be a valid PostgreSQL connection string"
+            )
         return value
 
     class Config:
@@ -55,6 +63,7 @@ class Settings(BaseSettings):
         case_sensitive = True
         # Allow extra fields
         extra = "ignore"
+
 
 @lru_cache
 def get_settings() -> Settings:
