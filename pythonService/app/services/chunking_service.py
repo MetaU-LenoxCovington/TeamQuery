@@ -1,17 +1,33 @@
 import logging
 import re
-from typing import List
+from typing import List, Tuple
+
+import nltk
 
 from app.services.llm_service import llm_service
+from nltk.tokenize import sent_tokenize
 
 logger = logging.getLogger(__name__)
+
+try:
+    nltk.data.find("tokenizers/punkt")
+except LookupError:
+    nltk.download("punkt")
 
 
 class ChunkingService:
 
     def __init__(self):
-        self.split_pattern = "\n"
         self.chunking_prompt = self._get_chunking_prompt()
+
+        self.COMPLEXITY_THRESHOLDS = {"high": 0.7, "medium": 0.4, "low": 0.0}
+
+        # Target chunk sizes based on complexity
+        self.SIZE_RANGES = {
+            "high_complexity": 300,
+            "medium_complexity": 500,
+            "low_complexity": 700,
+        }
 
     def _get_chunking_prompt(self) -> str:
         return """
@@ -35,23 +51,123 @@ Respond only with the IDs of the chunks where you believe a split should occur.
 YOU MUST RESPOND WITH AT LEAST ONE SPLIT
 """.strip()
 
+    def calculate_text_complexity(self, text: str) -> float:
+
+        if not text.strip():
+            return 0.0
+
+        try:
+            # Split into words and sentences
+            words = re.findall(r"\b\w+\b", text.lower())
+            sentences = sent_tokenize(text)
+
+            if not words or not sentences:
+                return 0.0
+
+            # Lexical density (unique words / total words)
+            unique_words = set(words)
+            lexical_density = len(unique_words) / len(words)
+
+            # Average sentence length
+            avg_sentence_length = len(words) / len(sentences)
+            # assume 20+ words per sentence is complex
+            sentence_complexity = min(1.0, avg_sentence_length / 20.0)
+
+            # Punctuation complexity (semicolons, colons, parentheses)
+            complex_punct = len(re.findall(r"[;:(){}[\]]", text))
+            punct_density = complex_punct / len(words) if words else 0
+            punct_complexity = min(1.0, punct_density * 100)  # Scale up
+
+            # Combine factors (weighted average)
+            complexity = (
+                lexical_density * 0.4
+                + sentence_complexity * 0.4
+                + punct_complexity * 0.2
+            )
+
+            return min(1.0, complexity)
+
+        except Exception as e:
+            logger.warning(f"Error calculating text complexity: {e}")
+            return 0.5  # Default to medium complexity
+
+    def get_target_chunk_size(self, complexity_score: float) -> int:
+        if complexity_score >= self.COMPLEXITY_THRESHOLDS["high"]:
+            return self.SIZE_RANGES["high_complexity"]
+        elif complexity_score >= self.COMPLEXITY_THRESHOLDS["medium"]:
+            return self.SIZE_RANGES["medium_complexity"]
+        else:
+            return self.SIZE_RANGES["low_complexity"]
+
+    def split_into_sentences(self, text: str) -> List[str]:
+        try:
+            sentences = sent_tokenize(text)
+            return [s.strip() for s in sentences if s.strip()]
+        except Exception as e:
+            logger.warning(f"Error splitting into sentences: {e}")
+            return [s.strip() for s in text.split(".") if s.strip()]
+
+    def count_words(self, text: str) -> int:
+        return len(re.findall(r"\b\w+\b", text))
+
     def prepare_chunked_text(self, document_text: str) -> str:
-        """
-        Args:
-            document_text: Raw document text
+        try:
+            # Calculate document complexity to determine target chunk size
+            complexity_score = self.calculate_text_complexity(document_text)
+            target_size = self.get_target_chunk_size(complexity_score)
 
-        Returns:
-            Text with chunk markers
-        """
-        chunks = document_text.split(self.split_pattern)
+            logger.info(
+                f"Document complexity: {complexity_score:.2f}, target chunk size: {target_size} words"
+            )
 
-        chunked_text = ""
-        for i, chunk in enumerate(chunks):
-            if chunk.startswith("#"):
-                chunk = f"#{chunk}"
-            chunked_text += f"<|start_chunk_{i}>\n{chunk}<|end_chunk_{i}|>"
+            # Split document into sentences for better boundary preservation
+            sentences = self.split_into_sentences(document_text)
 
-        return chunked_text
+            if not sentences:
+                logger.warning("No sentences found, falling back to original text")
+                return f"<|start_chunk_0>\n{document_text}<|end_chunk_0|>"
+
+            # Group sentences into chunks based on target size
+            chunks = []
+            current_chunk = []
+            current_word_count = 0
+
+            for sentence in sentences:
+                sentence_word_count = self.count_words(sentence)
+
+                # If adding this sentence would exceed target size
+                if (
+                    current_word_count + sentence_word_count > target_size
+                    and current_chunk
+                    and current_word_count >= target_size * 0.5
+                ):
+                    chunks.append(" ".join(current_chunk))
+                    current_chunk = [sentence]
+                    current_word_count = sentence_word_count
+                else:
+                    current_chunk.append(sentence)
+                    current_word_count += sentence_word_count
+
+            if current_chunk:
+                chunks.append(" ".join(current_chunk))
+
+            # If no chunks were created, use the whole document
+            if not chunks:
+                chunks = [document_text]
+
+            logger.info(
+                f"Created {len(chunks)} initial chunks with target size {target_size} words"
+            )
+
+            chunked_text = ""
+            for i, chunk in enumerate(chunks):
+                chunked_text += f"<|start_chunk_{i}>\n{chunk.strip()}<|end_chunk_{i}|>"
+
+            return chunked_text
+
+        except Exception as e:
+            logger.error(f"Error in prepare_chunked_text: {e}")
+            return f"<|start_chunk_0>\n{document_text}<|end_chunk_0|>"
 
     def get_llm_chunking_suggestions(self, chunked_text: str) -> str:
         """
