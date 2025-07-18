@@ -350,13 +350,12 @@ class TextCleaningService:
         return "".join(cleaned_parts)
 
 
-# Global service instance
-_text_cleaning_service = None
 
 
 def get_text_cleaning_service() -> TextCleaningService:
-    """Get or create the global text cleaning service instance."""
     global _text_cleaning_service
     if _text_cleaning_service is None:
         _text_cleaning_service = TextCleaningService()
     return _text_cleaning_service
+
+text_cleaning_service = get_text_cleaning_service()
