@@ -169,7 +169,17 @@ class HNSWNode:
         return True
 
     def update_metadata(self, new_metadata: Dict[str, Any]):
+        """partial update"""
         self.metadata.update(new_metadata)
+
+    def set_metadata(self, new_metadata: Dict[str, Any]):
+        """Completely replace metadata or set new metadata"""
+        self.metadata = new_metadata.copy()
+
+    def delete_metadata_fields(self, fields_to_delete: List[str]):
+        """Remove specific fields from metadata"""
+        for field in fields_to_delete:
+            self.metadata.pop(field, None)
 
     def clear_cache(self) -> None:
         self._distance_cache.clear()
