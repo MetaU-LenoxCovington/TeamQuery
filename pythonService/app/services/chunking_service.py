@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 try:
     nltk.data.find("tokenizers/punkt")
 except LookupError:
-    nltk.download("punkt")
+    nltk.download("punkt_tab")
 
 
 class ChunkingService:
@@ -169,7 +169,7 @@ YOU MUST RESPOND WITH AT LEAST ONE SPLIT
             logger.error(f"Error in prepare_chunked_text: {e}")
             return f"<|start_chunk_0>\n{document_text}<|end_chunk_0|>"
 
-    def get_llm_chunking_suggestions(self, chunked_text: str) -> str:
+    async def get_llm_chunking_suggestions(self, chunked_text: str) -> str:
         """
 
         Args:
@@ -179,7 +179,7 @@ YOU MUST RESPOND WITH AT LEAST ONE SPLIT
             LLM response with split suggestions
         """
         prompt = self.chunking_prompt.format(document_text=chunked_text)
-        return llm_service.call_model_sync(prompt)
+        return await llm_service.call_model(prompt)
 
     def split_text_by_llm_suggestions(
         self, chunked_text: str, llm_response: str
@@ -237,7 +237,7 @@ YOU MUST RESPOND WITH AT LEAST ONE SPLIT
         logger.info(f"Created {len(sections)} sections")
         return sections
 
-    def chunk_document(self, document_text: str) -> List[str]:
+    async def chunk_document(self, document_text: str) -> List[str]:
         """
 
         Args:
@@ -255,7 +255,7 @@ YOU MUST RESPOND WITH AT LEAST ONE SPLIT
             chunked_text = self.prepare_chunked_text(document_text)
 
             # Get LLM suggestions on which sections to turn into chunks
-            llm_response = self.get_llm_chunking_suggestions(chunked_text)
+            llm_response = await self.get_llm_chunking_suggestions(chunked_text)
             logger.info(f"LLM chunking response: {llm_response}")
 
             chunks = self.split_text_by_llm_suggestions(chunked_text, llm_response)

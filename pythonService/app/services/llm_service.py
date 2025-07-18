@@ -1,10 +1,11 @@
 import logging
 from typing import Optional
 
-from app.config import settings
+from app.config import get_settings
 from ollama import chat
 
 logger = logging.getLogger(__name__)
+settings = get_settings()
 
 
 class LLMService:
