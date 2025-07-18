@@ -1,0 +1,3 @@
+"""
+Custom search indexes.
+"""
