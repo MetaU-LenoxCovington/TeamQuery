@@ -39,10 +39,10 @@ Here is the chunk to contextualize:
 Respond only with the succinct context for this chunk. Do not mention it is a chunk or that you are providing context.
 """.strip()
 
-    def generate_context_for_chunk(self, chunk: str, document: str) -> str:
+    async def generate_context_for_chunk(self, chunk: str, document: str) -> str:
         try:
             prompt = self.contextualizer_prompt.format(document=document, chunk=chunk)
-            context = llm_service.call_model_sync(prompt)
+            context = await llm_service.call_model(prompt)
 
             logger.debug(
                 f"Generated context for chunk (length {len(chunk)}): {context[:100]}..."
@@ -53,7 +53,7 @@ Respond only with the succinct context for this chunk. Do not mention it is a ch
             logger.error(f"Error generating context for chunk: {e}")
             return ""
 
-    def generate_contexts_for_chunks(
+    async def generate_contexts_for_chunks(
         self, chunks: List[str], document: str
     ) -> List[str]:
         contexts = []
@@ -64,16 +64,16 @@ Respond only with the succinct context for this chunk. Do not mention it is a ch
         for i, chunk in enumerate(chunks):
             logger.info(f"Processing chunk {i+1}/{total_chunks}")
 
-            context = self.generate_context_for_chunk(chunk, document)
+            context = await self.generate_context_for_chunk(chunk, document)
             contexts.append(context)
 
         logger.info(f"Successfully generated {len(contexts)} contexts")
         return contexts
 
-    def create_contextualized_chunks(
+    async def create_contextualized_chunks(
         self, chunks: List[str], document: str
     ) -> List[str]:
-        contexts = self.generate_contexts_for_chunks(chunks, document)
+        contexts = await self.generate_contexts_for_chunks(chunks, document)
 
         contextualized_chunks = []
         for chunk, context in zip(chunks, contexts):
