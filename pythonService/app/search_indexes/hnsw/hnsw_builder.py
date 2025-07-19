@@ -87,6 +87,7 @@ class HNSWBuilder:
         new_chunk_ids: List[str],
         new_document_ids: List[str],
         new_metadata_list: List[Dict[str, Any]],
+        updated_metadata: List[Tuple[str, Dict[str, Any]]] = None,
         removed_chunk_ids: List[str] = None,
         progress_callback: callable = None
     ) -> HNSWIndex:
@@ -99,6 +100,7 @@ class HNSWBuilder:
             new_chunk_ids: New chunk IDs to add
             new_document_ids: New document IDs to add
             new_metadata_list: New metadata to add
+            updated_metadata: List of (chunk_id, new_metadata_dict) tuples
             removed_chunk_ids: Chunk IDs to remove
             progress_callback: Progress callback function
 
@@ -107,7 +109,15 @@ class HNSWBuilder:
         """
         logger.info(f"Rebuilding HNSW index for organization {self.organization_id}")
 
-        # Remove nodes first
+        # Update metadata first
+        if updated_metadata:
+            updated_count = 0
+            for chunk_id, new_meta in updated_metadata:
+                if existing_index.update_node_metadata(chunk_id, new_meta):
+                    updated_count += 1
+            logger.info(f"Updated metadata for {updated_count} nodes")
+
+        # Remove nodes
         if removed_chunk_ids:
             removed_count = 0
             for chunk_id in removed_chunk_ids:
