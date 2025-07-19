@@ -1,11 +1,18 @@
-import random
 import heapq
+import logging
 import math
-from typing import Dict, List, Set, Tuple, Optional, Any
-import numpy as np
+import random
 from collections import defaultdict
+from typing import Any, Dict, List, Optional, Set, Tuple, TYPE_CHECKING
+
+import numpy as np
 
 from .hnsw_node import HNSWNode
+
+if TYPE_CHECKING:
+    from .hnsw_node import HNSWNode as HNSWNodeType
+
+logger = logging.getLogger(__name__)
 
 
 class HNSWIndex:
@@ -16,7 +23,7 @@ class HNSWIndex:
         M: int = 16,
         ef_construction: int = 200,
         M_L: float = 1 / math.log(2.0),
-        seed: int = None
+        seed: int = None,
     ):
         """
         Args:
@@ -50,7 +57,7 @@ class HNSWIndex:
 
     def _select_level(self) -> int:
         """Select a random level for a new node.
-           Number of nodes at each layer grows exponentially as you go down the layers
+        Number of nodes at each layer grows exponentially as you go down the layers
         """
         level = int(-math.log(random.random()) * self.M_L)
         return level
@@ -61,7 +68,7 @@ class HNSWIndex:
         entry_points: List[str],
         num_closest: int,
         layer: int,
-        filters: Optional[Dict[str, Any]] = None
+        filters: Optional[Dict[str, Any]] = None,
     ) -> List[Tuple[float, str]]:
         """
         Search for closest nodes in a specific layer
@@ -145,7 +152,7 @@ class HNSWIndex:
         M: int,
         layer: int,
         extend_candidates: bool = True,
-        keep_pruned_connections: bool = True
+        keep_pruned_connections: bool = True,
     ) -> List[str]:
         """
         Select M neighbors from candidates using heuristic to maintain connectivity.
@@ -204,7 +211,7 @@ class HNSWIndex:
         vector: np.ndarray,
         chunk_id: str,
         document_id: str,
-        metadata: Dict[str, Any]
+        metadata: Dict[str, Any],
     ) -> str:
         """
 
@@ -239,9 +246,7 @@ class HNSWIndex:
 
         # Search from top layer down to level+1
         for lc in range(self.max_layer, level, -1):
-            current_nearest = self._search_layer(
-                vector, current_nearest, 1, lc
-            )
+            current_nearest = self._search_layer(vector, current_nearest, 1, lc)
             current_nearest = [node_id for _, node_id in current_nearest]
 
         # Search and connect from level down to 0
@@ -252,9 +257,7 @@ class HNSWIndex:
 
             # Select neighbors
             M = self.max_M0 if lc == 0 else self.max_M
-            selected_neighbors = self._select_neighbors_heuristic(
-                candidates, M, lc
-            )
+            selected_neighbors = self._select_neighbors_heuristic(candidates, M, lc)
 
             # Add connections
             for neighbor_id in selected_neighbors:
@@ -290,7 +293,10 @@ class HNSWIndex:
 
                     # Remove links that were pruned
                     for old_conn_id in old_connections:
-                        if old_conn_id not in new_connections and old_conn_id in self.nodes:
+                        if (
+                            old_conn_id not in new_connections
+                            and old_conn_id in self.nodes
+                        ):
                             self.nodes[old_conn_id].remove_connection(lc, neighbor_id)
 
                     # Add links for new connections
@@ -313,8 +319,8 @@ class HNSWIndex:
         query_vector: np.ndarray,
         k: int = 10,
         ef: Optional[int] = None,
-        filters: Optional[Dict[str, Any]] = None
-    ) -> List[Tuple[float, str, str]]:
+        filters: Optional[Dict[str, Any]] = None,
+    ) -> List[Tuple[float, str, HNSWNode]]:
         """
         Args:
             query_vector: Query vector to search for
@@ -323,7 +329,7 @@ class HNSWIndex:
             filters: Optional metadata filters
 
         Returns:
-            List of (distance, node_id, chunk_id) tuples
+            List of (distance, node_id, node) tuples
         """
         if not self.nodes or self.entry_point is None:
             return []
@@ -342,18 +348,86 @@ class HNSWIndex:
             current_nearest = [node_id for _, node_id in current_nearest]
 
         # Search layer 0 with ef
-        candidates = self._search_layer(
-            query_vector, current_nearest, ef, 0, filters
-        )
+        candidates = self._search_layer(query_vector, current_nearest, ef, 0, filters)
 
         # Return top k results
         results = []
         for distance, node_id in candidates[:k]:
             if node_id in self.nodes:
                 node = self.nodes[node_id]
-                results.append((distance, node_id, node.chunk_id))
+                # Skip deleted nodes
+                if not node.is_deleted:
+                    results.append((distance, node_id, node))
 
         return results
+
+    def update_node_metadata(self, chunk_id: str, new_metadata: Dict[str, Any]) -> bool:
+        """
+        Update the metadata of a specific node identified by its chunk_id.
+
+        Args:
+            chunk_id: ID of the chunk whose node is being updated
+            new_metadata: A dictionary containing the metadata fields to update
+
+        Returns:
+            True if the node was found and updated, False otherwise.
+        """
+        for node in self.nodes.values():
+            if node.chunk_id == chunk_id:
+                node.update_metadata(new_metadata)
+                logger.info(
+                    f"Updated metadata for node corresponding to chunk {chunk_id}"
+                )
+                return True
+
+        logger.warning(f"Could not find node for chunk {chunk_id} to update metadata.")
+        return False
+
+    def set_node_metadata(self, chunk_id: str, new_metadata: Dict[str, Any]) -> bool:
+        """
+        Completely replace metadata for a node.
+
+        Args:
+            chunk_id: ID of the chunk whose node metadata is being replaced
+            new_metadata: A dictionary containing the new metadata to set
+
+        Returns:
+            True if the node was found and updated, False otherwise.
+        """
+        for node in self.nodes.values():
+            if node.chunk_id == chunk_id:
+                node.set_metadata(new_metadata)
+                logger.info(f"Set metadata for node corresponding to chunk {chunk_id}")
+                return True
+
+        logger.warning(f"Could not find node for chunk {chunk_id} to set metadata.")
+        return False
+
+    def delete_node_metadata_fields(
+        self, chunk_id: str, fields_to_delete: List[str]
+    ) -> bool:
+        """
+        Remove specific fields from a node's metadata.
+
+        Args:
+            chunk_id: ID of the chunk whose node metadata fields are being deleted
+            fields_to_delete: List of field names to remove from metadata
+
+        Returns:
+            True if the node was found and fields were deleted, False otherwise.
+        """
+        for node in self.nodes.values():
+            if node.chunk_id == chunk_id:
+                node.delete_metadata_fields(fields_to_delete)
+                logger.info(
+                    f"Deleted metadata fields {fields_to_delete} for node corresponding to chunk {chunk_id}"
+                )
+                return True
+
+        logger.warning(
+            f"Could not find node for chunk {chunk_id} to delete metadata fields."
+        )
+        return False
 
     def remove_node(self, node_id: str) -> bool:
         if node_id not in self.nodes:
@@ -405,22 +479,24 @@ class HNSWIndex:
                     for node_id in self.layers[layer]
                     if node_id in self.nodes
                 )
-                avg_connections_per_layer[layer] = total_connections / len(self.layers[layer])
+                avg_connections_per_layer[layer] = total_connections / len(
+                    self.layers[layer]
+                )
             else:
                 avg_connections_per_layer[layer] = 0
 
         return {
-            'organization_id': self.organization_id,
-            'total_nodes': self.size,
-            'max_layer': self.max_layer,
-            'entry_point': self.entry_point,
-            'layer_sizes': layer_sizes,
-            'avg_connections_per_layer': avg_connections_per_layer,
-            'parameters': {
-                'M': self.M,
-                'ef_construction': self.ef_construction,
-                'M_L': self.M_L
-            }
+            "organization_id": self.organization_id,
+            "total_nodes": self.size,
+            "max_layer": self.max_layer,
+            "entry_point": self.entry_point,
+            "layer_sizes": layer_sizes,
+            "avg_connections_per_layer": avg_connections_per_layer,
+            "parameters": {
+                "M": self.M,
+                "ef_construction": self.ef_construction,
+                "M_L": self.M_L,
+            },
         }
 
     def clear(self) -> None:
@@ -430,3 +506,17 @@ class HNSWIndex:
         self.entry_point = None
         self.max_layer = 0
         self.size = 0
+
+    def mark_deleted_by_chunk_id(self, chunk_id: str) -> bool:
+        """
+        Mark a node as deleted by its chunk_id.
+        Can't do hard delete because we need to preserve graph connectivity
+        """
+        for node_id, node in self.nodes.items():
+            if node.chunk_id == chunk_id:
+                node.is_deleted = True
+                logger.debug(
+                    f"Marked node {node_id} with chunk_id {chunk_id} as deleted"
+                )
+                return True
+        return False
