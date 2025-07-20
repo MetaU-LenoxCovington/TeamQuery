@@ -55,6 +55,8 @@ model Organization {
   groups             Group[]
   documents         Document[]
   folders           Folder[]
+  chunks            Chunk[]
+  embeddings        Embedding[]
   auditLogs         AuditLog[]
   searchQueries     SearchQuery[]
   invitations       OrganizationInvite[]
@@ -234,9 +236,11 @@ model Chunk {
   metadata      Json?
 
   isDeleted     Boolean @default(false)
+  organizationId String
 
   document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
   documentId String
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   embedding  Embedding?
 
   recency       Int @default(0)
@@ -246,6 +250,7 @@ model Chunk {
   updatedAt DateTime @updatedAt
 
   @@index([documentId])
+  @@index([organizationId])
   @@index([isDeleted])
   @@index([recency])
   @@index([popularity])
@@ -257,11 +262,13 @@ model Embedding {
   metadata      Json?
 
   isDeleted     Boolean @default(false)
+  organizationId String
 
   document    Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
   documentId  String
   chunk       Chunk    @relation(fields: [chunkId], references: [id], onDelete: Cascade)
   chunkId     String   @unique
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   recency       Int @default(0)
   popularity    Int @default(0)
@@ -271,6 +278,7 @@ model Embedding {
 
   @@index([documentId])
   @@index([chunkId])
+  @@index([organizationId])
   @@index([isDeleted])
   @@index([recency])
   @@index([popularity])
