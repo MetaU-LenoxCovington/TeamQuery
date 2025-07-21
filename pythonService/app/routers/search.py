@@ -3,6 +3,9 @@ from pydantic import BaseModel
 from typing import List, Optional, Dict, Any
 import logging
 
+from app.services.search_index_builder_service import search_index_builder
+from app.services.search_service import search_service
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
@@ -68,7 +71,7 @@ class IndexStatus(BaseModel):
     build_time: Optional[float] = None
 
 
-@router.post("/build-index", response_model=Dict[str, str])
+@router.post("/build-index", response_model=Dict[str, Any])
 async def build_search_index(request: IndexBuildRequest):
     """
     Build search indexes for an organization
@@ -76,73 +79,56 @@ async def build_search_index(request: IndexBuildRequest):
     try:
         logger.info(f"Building search index for organization {request.organization_id}")
 
-        # TODO: Implement actual index building
-        # 1. Load all chunks and embeddings for organization
-        # 2. Build HNSW index
-        # 3. Build BM25 index
-        # 4. Build inverted index
-        # 5. Build metadata index
-        # 6. Store index in memory
+        org_indexes = await search_index_builder.build_or_update_index(
+            request.organization_id,
+            force_rebuild=request.force_rebuild
+        )
 
-        return {"message": f"Index building started for organization {request.organization_id}"}
+        return {
+            "message": f"Index built successfully for organization {request.organization_id}",
+            "stats": {
+                "chunk_count": org_indexes.chunk_count,
+                "document_count": org_indexes.document_count,
+                "last_updated": org_indexes.last_updated.isoformat() if org_indexes.last_updated else None,
+                "has_hnsw": org_indexes.hnsw_index is not None
+            }
+        }
 
     except Exception as e:
         logger.error(f"Failed to build search index: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/index-status/{organization_id}", response_model=IndexStatus)
-async def get_index_status(organization_id: str):
-    """
-    Get the status of search indexes for an organization
-    """
-    try:
-        # TODO: Implement actual status checking
-        return IndexStatus(
-            organization_id=organization_id,
-            status="ready",
-            document_count=25,
-            chunk_count=150,
-            last_updated="2024-01-15T10:30:00Z",
-            build_time=45.2
-        )
-
-    except Exception as e:
-        logger.error(f"Failed to get index status: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@router.post("/search", response_model=SearchResponse)
+@router.post("/search", response_model=Dict[str, Any])
 async def search_documents(query: SearchQuery):
-    """
-    Search documents using hybrid search (vector + keyword + metadata)
-    """
     try:
         logger.info(f"Searching for: {query.query} in org {query.organization_id}")
 
-        # TODO: Implement actual search
-        # 1. Check if index exists for organization
-        # 2. Run hybrid search (HNSW + BM25 + inverted + metadata)
-        # 3. Apply RRF reranking
-        # 4. Return results
-
-        # Mock response for now
-        mock_results = [
-            SearchResult(
-                chunk_id="chunk_1",
-                document_id="doc_1",
-                content="This is a sample search result about the query topic...",
-                score=0.85,
-                metadata={"page": 1, "document_title": "Sample Document"}
-            )
-        ]
-
-        return SearchResponse(
+        search_results = await search_service.search(
             query=query.query,
-            results=mock_results,
-            total_results=len(mock_results),
-            processing_time=0.123
+            organization_id=query.organization_id,
+            filters=query.filters,
+            k=query.k
         )
+
+        formatted_results = []
+        for result in search_results.get("results", []):
+            formatted_results.append({
+                "chunk_id": result["chunk_id"],
+                "document_id": result["document_id"],
+                "content": result["content"],
+                "score": result["score"],
+                "metadata": result["metadata"]
+            })
+
+        return {
+            "query": search_results["query"],
+            "results": formatted_results,
+            "total_results": search_results["total_results"],
+            "processing_time": search_results["processing_time"],
+            "indexes_used": search_results.get("indexes_used", {}),
+            "error": search_results.get("error")
+        }
 
     except Exception as e:
         logger.error(f"Search failed: {e}")
@@ -188,6 +174,49 @@ async def rag_query(query: RAGQuery):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.get("/index-status/{organization_id}")
+async def get_index_status(organization_id: str):
+    try:
+        org_indexes = search_index_builder.get_indexes(organization_id)
+
+        if not org_indexes:
+            return {
+                "organization_id": organization_id,
+                "status": "not_found",
+                "message": "No indexes found for this organization"
+            }
+
+        return {
+            "organization_id": organization_id,
+            "status": "ready" if not org_indexes.is_building else "building",
+            "chunk_count": org_indexes.chunk_count,
+            "document_count": org_indexes.document_count,
+            "last_updated": org_indexes.last_updated.isoformat() if org_indexes.last_updated else None,
+            "indexes": {
+                "hnsw": {
+                    "status": "ready" if org_indexes.hnsw_index else "not_built",
+                    "chunk_count": org_indexes.chunk_count if org_indexes.hnsw_index else 0
+                },
+                "bm25": {"status": "not_implemented"},
+                "inverted": {"status": "not_implemented"}
+            }
+        }
+
+    except Exception as e:
+        logger.error(f"Failed to get index status: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/index-stats")
+async def get_all_index_stats():
+    try:
+        stats = search_index_builder.get_stats()
+        return stats
+    except Exception as e:
+        logger.error(f"Failed to get index stats: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.delete("/index/{organization_id}")
 async def destroy_index(organization_id: str):
     """
@@ -196,11 +225,12 @@ async def destroy_index(organization_id: str):
     try:
         logger.info(f"Destroying index for organization {organization_id}")
 
-        # TODO: Implement actual index destruction
-        # 1. Remove from memory
-        # 2. Clean up any cached data
+        success = search_index_builder.destroy_indexes(organization_id)
 
-        return {"message": f"Index destroyed for organization {organization_id}"}
+        if success:
+            return {"message": f"Index destroyed for organization {organization_id}"}
+        else:
+            return {"message": f"No indexes found for organization {organization_id}"}
 
     except Exception as e:
         logger.error(f"Failed to destroy index: {e}")
