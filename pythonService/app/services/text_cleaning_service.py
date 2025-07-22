@@ -349,8 +349,18 @@ class TextCleaningService:
 
         return "".join(cleaned_parts)
 
+    def cleanup(self) -> None:
+        logging.info("Cleaning up TextCleaningService")
+        try:
+            self.kenlm_model = None
+            self.nlp = None
+            self.sym = None
+            self.en_words = None
+            logging.debug("Cleared TextCleaningService ML models")
+        except Exception as e:
+            logging.warning(f"Error during TextCleaningService cleanup: {e}")
 
-
+_text_cleaning_service: Optional[TextCleaningService] = None
 
 def get_text_cleaning_service() -> TextCleaningService:
     global _text_cleaning_service
