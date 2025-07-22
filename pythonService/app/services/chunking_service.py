@@ -10,7 +10,7 @@ from nltk.tokenize import sent_tokenize
 logger = logging.getLogger(__name__)
 
 try:
-    nltk.data.find("tokenizers/punkt")
+    nltk.data.find("tokenizers/punkt_tab")
 except LookupError:
     nltk.download("punkt_tab")
 
@@ -39,7 +39,9 @@ You are an assistant specialized in splitting text into semantically consistent 
     <instruction>Each chunk must be between 200 and 1000 words</instruction>
     <instruction>If chunks 1 and 2 belong together but chunk 3 starts a new topic, suggest a split after chunk 2</instruction>
     <instruction>The chunks must be listed in ascending order</instruction>
-    <instruction>Provide your response in the form: 'split_after: 3, 5'</instruction>
+    <instruction>Respond ONLY with the format: split_after: X, Y, Z (where X, Y, Z are chunk numbers)</instruction>
+    <instruction>If no splits are needed, respond with: split_after: none</instruction>
+    <instruction>Do NOT include any explanatory text, reasoning, or additional commentary</instruction>
 </instructions>
 
 This is the document text:
@@ -47,8 +49,7 @@ This is the document text:
 {document_text}
 </document>
 
-Respond only with the IDs of the chunks where you believe a split should occur.
-YOU MUST RESPOND WITH AT LEAST ONE SPLIT
+Respond ONLY with the split_after format. No other text.
 """.strip()
 
     def calculate_text_complexity(self, text: str) -> float:
@@ -197,29 +198,30 @@ YOU MUST RESPOND WITH AT LEAST ONE SPLIT
 
         if "split_after:" in llm_response:
             split_points = llm_response.split("split_after:")[1].strip()
-            try:
-                split_after = [
-                    int(x.strip()) for x in split_points.split(",") if x.strip()
-                ]
-            except ValueError as e:
-                logger.warning(f"Failed to parse split points from LLM response: {e}")
+            if split_points.lower() != "none":
+                try:
+                    split_after = [
+                        int(x.strip()) for x in split_points.split(",") if x.strip()
+                    ]
+                except ValueError as e:
+                    logger.warning(f"Failed to parse split points from LLM response: {e}")
 
         logger.info(f"Split after chunks: {split_after}")
-
-        # Return whole text as one chunk if no splits were suggested
-        if not split_after:
-            logger.info("No splits suggested, returning whole text as one chunk")
-            return [chunked_text]
 
         # Extract chunks using regex
         chunk_pattern = r"<\|start_chunk_(\d+)\|?>(.*?)<\|end_chunk_\1\|>"
         chunks = re.findall(chunk_pattern, chunked_text, re.DOTALL)
 
         if not chunks:
-            logger.warning("No chunks found in text, returning original")
-            return [chunked_text]
+            logger.warning("No chunks found in text, falling back to size-based chunking")
+            return self._fallback_size_based_chunking(chunked_text)
 
         logger.info(f"Found {len(chunks)} chunks")
+
+        if not split_after:
+            logger.info("No splits suggested, using fallback size-based chunking")
+            original_text = "".join([chunk_text.strip() for _, chunk_text in chunks])
+            return self._fallback_size_based_chunking(original_text)
 
         sections = []
         current_section = []
@@ -234,8 +236,66 @@ YOU MUST RESPOND WITH AT LEAST ONE SPLIT
         if current_section:
             sections.append("".join(current_section).strip())
 
-        logger.info(f"Created {len(sections)} sections")
+        max_words = 2000  # Maximum acceptable chunk size
+        oversized_chunks = []
+
+        for i, section in enumerate(sections):
+            word_count = self.count_words(section)
+            if word_count > max_words:
+                oversized_chunks.append((i, word_count))
+
+        if oversized_chunks:
+            logger.warning(f"Found {len(oversized_chunks)} oversized chunks (max words: {max_words}). "
+                         f"Oversized chunks: {oversized_chunks}")
+            logger.info("Using fallback size-based chunking due to oversized chunks")
+            original_text = "".join([chunk_text.strip() for _, chunk_text in chunks])
+            return self._fallback_size_based_chunking(original_text)
+
+        logger.info(f"Created {len(sections)} sections with acceptable sizes")
         return sections
+
+    def _fallback_size_based_chunking(self, text: str) -> List[str]:
+        try:
+            complexity_score = self.calculate_text_complexity(text)
+            target_size = self.get_target_chunk_size(complexity_score)
+
+            logger.info(f"Using fallback chunking with target size: {target_size} words")
+
+            sentences = self.split_into_sentences(text)
+
+            if not sentences:
+                return [text]
+
+            chunks = []
+            current_chunk = []
+            current_word_count = 0
+
+            for sentence in sentences:
+                sentence_word_count = self.count_words(sentence)
+
+                if (current_word_count + sentence_word_count > target_size
+                    and current_chunk
+                    and current_word_count >= target_size * 0.5):
+
+                    chunks.append(" ".join(current_chunk).strip())
+                    current_chunk = [sentence]
+                    current_word_count = sentence_word_count
+                else:
+                    current_chunk.append(sentence)
+                    current_word_count += sentence_word_count
+
+            if current_chunk:
+                chunks.append(" ".join(current_chunk).strip())
+
+            if not chunks:
+                chunks = [text]
+
+            logger.info(f"Fallback chunking created {len(chunks)} chunks")
+            return chunks
+
+        except Exception as e:
+            logger.error(f"Error in fallback chunking: {e}")
+            return [text]
 
     async def chunk_document(self, document_text: str) -> List[str]:
         """
@@ -267,6 +327,14 @@ YOU MUST RESPOND WITH AT LEAST ONE SPLIT
             logger.error(f"Error chunking document: {e}")
             return [document_text]
 
+    def cleanup(self) -> None:
+        """
+        Cleanup method to clear any cached data.
+        """
+        logger.info("Cleaning up ChunkingService")
+        try:
+            logger.debug("ChunkingService cleanup completed")
+        except Exception as e:
+            logger.warning(f"Error during ChunkingService cleanup: {e}")
 
-# Singleton instance
 chunking_service = ChunkingService()
