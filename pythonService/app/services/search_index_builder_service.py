@@ -13,6 +13,10 @@ from app.services.database_service import database_service
 # from app.search_indexes.bm25 import BM25Index
 # from app.search_indexes.inverted import InvertedIndex
 
+import aiofiles
+import os
+from pathlib import Path
+
 logger = logging.getLogger(__name__)
 
 
@@ -43,6 +47,11 @@ class SearchIndexBuilderService:
         # HNSW parameters
         self.hnsw_m = 16
         self.hnsw_ef_construction = 200
+
+        # Persistence settings
+        # TODO: Move to a config file
+        self.persistence_path = Path("data/indexes")
+        self.persistence_path.mkdir(parents=True, exist_ok=True)
 
     async def build_or_update_index(
         self, organization_id: str, force_rebuild: bool = False
@@ -172,15 +181,18 @@ class SearchIndexBuilderService:
             ef_construction=self.hnsw_ef_construction,
         )
 
-        for chunk in chunks_with_embeddings:
-            builder.add_node(
-                vector=chunk["embedding"],
-                chunk_id=chunk["chunk_id"],
-                document_id=chunk["document_id"],
-                metadata=chunk["metadata"],
-            )
+        vectors = []
+        chunk_ids = []
+        document_ids = []
+        metadata_list = []
 
-        return builder.build()
+        for chunk in chunks_with_embeddings:
+            vectors.append(chunk["embedding"])
+            chunk_ids.append(chunk["chunk_id"])
+            document_ids.append(chunk["document_id"])
+            metadata_list.append(chunk["metadata"])
+
+        return builder.build_index(vectors, chunk_ids, document_ids, metadata_list)
 
     async def add_chunks(
         self, organization_id: str, new_chunks: List[Dict[str, Any]]
@@ -221,7 +233,7 @@ class SearchIndexBuilderService:
                 f"for organization {organization_id}"
             )
 
-        # TODO: Add to BM25 and Inverted indexes
+        # TODO: Add to BM25
 
         org_indexes.chunk_count += len(new_chunks)
 
@@ -282,7 +294,7 @@ class SearchIndexBuilderService:
             for update in chunk_updates:
                 chunk_id = update["chunk_id"]
                 new_metadata = update["metadata"]
-                if org_indexes.hnsw_index.update_metadata_by_chunk_id(
+                if org_indexes.hnsw_index.update_node_metadata(
                     chunk_id, new_metadata
                 ):
                     updated_count += 1
@@ -295,6 +307,13 @@ class SearchIndexBuilderService:
 
         return True
 
+    async def trigger_full_reprocess(self, organization_id: str):
+        """
+        TODO: Implement full document reprocessing.
+        """
+        logger.warning(f"TODO: Full re-process triggered for {organization_id}. Not yet implemented.")
+        pass
+
     def get_indexes(self, organization_id: str) -> Optional[OrganizationIndexes]:
         return self.indexes.get(organization_id)
 
@@ -306,15 +325,72 @@ class SearchIndexBuilderService:
             and not org_indexes.is_building
         )
 
-    def destroy_indexes(self, organization_id: str) -> bool:
+    def cleanup(self) -> None:
+        logger.info("Cleaning up SearchIndexBuilderService")
+        try:
+            self.indexes.clear()
+            self.building_locks.clear()
+            logger.debug("SearchIndexBuilderService cleanup completed")
+        except Exception as e:
+            logger.warning(f"Error during SearchIndexBuilderService cleanup: {e}")
+
+    def destroy_indexes(self, organization_id: str, persist_to_disk: bool = False) -> bool:
         """
         Remove all indexes for an organization from memory.
+        Optionally persists the index to disk before destroying.
         """
         if organization_id in self.indexes:
             logger.info(f"Destroying indexes for organization {organization_id}")
+
+            if persist_to_disk:
+                org_indexes = self.indexes.get(organization_id)
+                if org_indexes and org_indexes.hnsw_index:
+                    self._persist_index(organization_id, org_indexes)
+
             del self.indexes[organization_id]
             return True
         return False
+
+    def _get_index_file_path(self, organization_id: str) -> Path:
+        return self.persistence_path / f"{organization_id}_hnsw.index"
+
+    def _persist_index(self, organization_id: str, org_indexes: OrganizationIndexes):
+        file_path = self._get_index_file_path(organization_id)
+        try:
+            logger.info(f"Persisting HNSW index to {file_path}...")
+            org_indexes.hnsw_index.save_to_disk(str(file_path))
+        except Exception as e:
+            logger.error(f"Failed to persist index for {organization_id}: {e}")
+
+    def load_persisted_index(self, organization_id: str) -> bool:
+        if self.has_indexes(organization_id):
+            logger.info(f"Index for {organization_id} is already in memory.")
+            return True
+
+        file_path = self._get_index_file_path(organization_id)
+        if not file_path.exists():
+            logger.info(f"No persisted index found for {organization_id} at {file_path}")
+            return False
+
+        try:
+            logger.info(f"Loading HNSW index from {file_path}...")
+            hnsw_index = HNSWIndex.load_from_disk(str(file_path))
+
+            # TODO: need a way to get other stats like chunk_count, doc_count
+            # when loading from disk. might need to be stored in the index file header.
+            org_indexes = OrganizationIndexes(
+                organization_id=organization_id,
+                hnsw_index=hnsw_index,
+                last_updated=datetime.fromtimestamp(file_path.stat().st_mtime),
+                chunk_count=hnsw_index.size,
+                document_count=0
+            )
+            self.indexes[organization_id] = org_indexes
+            logger.info(f"Successfully loaded index for {organization_id} into memory.")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to load persisted index for {organization_id}: {e}")
+            return False
 
     def get_stats(self) -> Dict[str, Any]:
         stats = {"total_organizations": len(self.indexes), "organizations": {}}
@@ -331,7 +407,6 @@ class SearchIndexBuilderService:
                 "is_building": org_indexes.is_building,
                 "has_hnsw": org_indexes.hnsw_index is not None,
                 # "has_bm25": org_indexes.bm25_index is not None,
-                # "has_inverted": org_indexes.inverted_index is not None
             }
 
         return stats
