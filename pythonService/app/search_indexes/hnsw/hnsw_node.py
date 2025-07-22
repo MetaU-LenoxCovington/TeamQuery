@@ -1,7 +1,10 @@
+import logging
 import uuid
 from typing import Any, Dict, List, Optional, Set
 
 import numpy as np
+
+logger = logging.getLogger(__name__)
 
 
 class HNSWNode:
@@ -113,11 +116,11 @@ class HNSWNode:
                 pass  # Continue to other filters, but permission is granted
             else:
                 doc_access_level = self.metadata.get("accessLevel")
+                doc_group_id = self.metadata.get("groupId")
 
                 if doc_access_level == "PUBLIC":
                     pass  # Accessible to all members
                 elif doc_access_level == "GROUP":
-                    doc_group_id = self.metadata.get("groupId")
                     if not doc_group_id or doc_group_id not in user_groups:
                         return False
                 elif doc_access_level == "MANAGERS":

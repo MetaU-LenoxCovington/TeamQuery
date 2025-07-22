@@ -6,6 +6,8 @@ from collections import defaultdict
 from typing import Any, Dict, List, Optional, Set, Tuple, TYPE_CHECKING
 
 import numpy as np
+import pickle
+from pathlib import Path
 
 from .hnsw_node import HNSWNode
 
@@ -93,11 +95,6 @@ class HNSWIndex:
                 continue
 
             ep_node = self.nodes[ep_id]
-
-            # Apply filters if provided
-            if filters and not ep_node.satisfies_filters(filters):
-                continue
-
             distance = ep_node.distance_to_vector(query_vector)
             heapq.heappush(candidates, (distance, ep_id))
             heapq.heappush(w, (-distance, ep_id))
@@ -119,10 +116,6 @@ class HNSWIndex:
 
                 visited.add(neighbor_id)
                 neighbor_node = self.nodes[neighbor_id]
-
-                # Apply filters if provided
-                if filters and not neighbor_node.satisfies_filters(filters):
-                    continue
 
                 distance = neighbor_node.distance_to_vector(query_vector)
 
@@ -343,23 +336,29 @@ class HNSWIndex:
         # Search from top layer down to layer 1
         for lc in range(self.max_layer, 0, -1):
             current_nearest = self._search_layer(
-                query_vector, current_nearest, 1, lc, filters
+                query_vector, current_nearest, 1, lc, None
             )
             current_nearest = [node_id for _, node_id in current_nearest]
 
-        # Search layer 0 with ef
-        candidates = self._search_layer(query_vector, current_nearest, ef, 0, filters)
+        # Using a larger ef to get more candidates since filtering is done afterwards
+        search_ef = max(ef, k * 3) if filters else ef
+        candidates = self._search_layer(query_vector, current_nearest, search_ef, 0, None)
 
-        # Return top k results
-        results = []
-        for distance, node_id in candidates[:k]:
+        filtered_results = []
+        for distance, node_id in candidates:
             if node_id in self.nodes:
                 node = self.nodes[node_id]
                 # Skip deleted nodes
-                if not node.is_deleted:
-                    results.append((distance, node_id, node))
+                if node.is_deleted:
+                    continue
 
-        return results
+                if filters and not node.satisfies_filters(filters):
+                    continue
+
+                filtered_results.append((distance, node_id, node))
+
+
+        return filtered_results[:k]
 
     def update_node_metadata(self, chunk_id: str, new_metadata: Dict[str, Any]) -> bool:
         """
@@ -520,3 +519,40 @@ class HNSWIndex:
                 )
                 return True
         return False
+
+    def save_to_disk(self, file_path: str):
+        """
+        TODO: Implement index persistence to disk.
+
+        This method will save the entire HNSW graph to a file.
+        using pickle for now to dump the entire object.
+        TODO: Implement a custom binary format that we can save in S3
+        """
+        # For now, using pickle as a placeholder
+        logger.info(f"Persisting index to {file_path}...")
+        path = Path(file_path)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with open(file_path, "wb") as f:
+            pickle.dump(self, f)
+        logger.info("Index persisted successfully.")
+
+    @classmethod
+    def load_from_disk(cls, file_path: str) -> "HNSWIndex":
+        """
+        TODO: Implement loading a persisted index from disk.
+
+        This method will deserialize an index file and reconstruct the
+        HNSWIndex object in memory
+        """
+        # using pickle as a placeholder
+        logger.info(f"Loading index from {file_path}...")
+        if not Path(file_path).exists():
+            raise FileNotFoundError(f"No persisted index found at {file_path}")
+
+        with open(file_path, "rb") as f:
+            index = pickle.load(f)
+        if not isinstance(index, cls):
+            raise TypeError("Persisted object is not a valid HNSWIndex")
+
+        logger.info(f"Index loaded successfully. Contains {index.size} nodes.")
+        return index
