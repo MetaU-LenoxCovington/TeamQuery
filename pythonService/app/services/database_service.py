@@ -79,10 +79,28 @@ class DatabaseService:
                         "restrictedToUsers": row["restrictedToUsers"] or [],
                     }
 
+                    chunk_metadata = row["chunk_metadata"]
+                    if isinstance(chunk_metadata, str):
+                        try:
+                            chunk_metadata = json.loads(chunk_metadata)
+                        except (json.JSONDecodeError, TypeError):
+                            chunk_metadata = {}
+                    elif chunk_metadata is None:
+                        chunk_metadata = {}
+
+                    document_metadata = row["document_metadata"]
+                    if isinstance(document_metadata, str):
+                        try:
+                            document_metadata = json.loads(document_metadata)
+                        except (json.JSONDecodeError, TypeError):
+                            document_metadata = {}
+                    elif document_metadata is None:
+                        document_metadata = {}
+
                     # Combine all metadata
                     metadata = {
-                        **(row["chunk_metadata"] or {}),
-                        **(row["document_metadata"] or {}),
+                        **chunk_metadata,
+                        **document_metadata,
                         "document_title": row["document_title"],
                         **permission_metadata,
                     }
@@ -170,6 +188,37 @@ class DatabaseService:
                 )
         except Exception as e:
             logger.error(f"Failed to update last index time: {e}")
+            raise
+
+    async def save_document(
+        self, document_id: str, organization_id: str, document_metadata: Dict[str, Any]
+    ) -> str:
+        """Save a document record to the database"""
+        query = """
+            INSERT INTO "Document" (
+                id, "organizationId", title, "accessLevel", "groupId",
+                "restrictedToUsers", metadata, "isDeleted", "createdAt", "updatedAt"
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, $7, false, NOW(), NOW())
+            RETURNING id
+        """
+
+        try:
+            async with self.pool.acquire() as conn:
+                await conn.execute(
+                    query,
+                    document_id,
+                    organization_id,
+                    document_metadata.get("title", "Untitled"),
+                    document_metadata.get("accessLevel", "GROUP"),
+                    document_metadata.get("groupId"),
+                    document_metadata.get("restrictedToUsers", []),
+                    json.dumps(document_metadata),
+                )
+                logger.info(f"Saved document {document_id} to database")
+                return document_id
+        except Exception as e:
+            logger.error(f"Failed to save document: {e}")
             raise
 
     async def save_chunk(
@@ -281,5 +330,17 @@ class DatabaseService:
         except Exception as e:
             logger.error(f"Failed to mark embeddings as deleted: {e}")
             raise
+    async def cleanup(self) -> None:
+        """
+        Cleanup method to close database connection pool.
+        """
+        logger.info("Cleaning up DatabaseService")
+        try:
+            if self.pool:
+                await self.pool.close()
+                self.pool = None
+                logger.debug("Closed database connection pool")
+        except Exception as e:
+            logger.warning(f"Error during DatabaseService cleanup: {e}")
 
 database_service = DatabaseService()
