@@ -1,3 +1,4 @@
+import json
 import logging
 from typing import List, Dict, Any, Optional, Tuple
 import numpy as np
@@ -81,7 +82,6 @@ class SearchService:
             results.extend(hnsw_results)
 
         # TODO: Add BM25 search when implemented
-        # TODO: Add Inverted index search when implemented
 
         # Sort by score and take top k
         # replace with RRF when implemented
@@ -142,27 +142,34 @@ class SearchService:
                 logger.error("Failed to generate query embedding")
                 return []
 
+            logger.debug(f"Generated query embedding for '{query}' with {len(query_embedding)} dimensions")
+            logger.debug(f"Searching HNSW index with filters: {filters}")
+
             search_results = hnsw_index.search(
                 query_vector=query_embedding,
                 k=k,
                 filters=filters
             )
 
+            logger.debug(f"HNSW index returned {len(search_results)} raw candidates")
+
             results = []
-            for node_id, score, node in search_results:
+            for distance, node_id, node in search_results:
                 # This is just a double check, the HNSW index should already filter
                 if node.is_deleted:
+                    logger.debug(f"Skipping deleted node {node_id}")
                     continue
 
                 result = SearchResult(
                     chunk_id=node.chunk_id,
                     document_id=node.document_id,
                     content="",  # Will be filled in later
-                    score=float(score),  # Convert numpy float to Python float
+                    score=1.0 / (1.0 + float(distance)),  # Convert distance to score, higher is better
                     metadata=node.metadata,
                     source="hnsw"
                 )
                 results.append(result)
+                logger.debug(f"Added result: chunk_id={node.chunk_id}, distance={distance:.4f}, score={result.score:.4f}")
 
             logger.info(f"HNSW search returned {len(results)} results for query: {query}")
             return results
@@ -195,15 +202,23 @@ class SearchService:
             async with database_service.pool.acquire() as conn:
                 rows = await conn.fetch(query, chunk_ids)
 
-                chunk_content_map = {
-                    row["chunk_id"]: {
+                chunk_content_map = {}
+                for row in rows:
+                    chunk_metadata = row["chunk_metadata"]
+                    if isinstance(chunk_metadata, str):
+                        try:
+                            chunk_metadata = json.loads(chunk_metadata)
+                        except (json.JSONDecodeError, TypeError):
+                            chunk_metadata = {}
+                    elif chunk_metadata is None:
+                        chunk_metadata = {}
+
+                    chunk_content_map[row["chunk_id"]] = {
                         "content": row["content"],
                         "document_title": row["document_title"],
                         "original_filename": row["original_filename"],
-                        "chunk_metadata": row["chunk_metadata"] or {}
+                        "chunk_metadata": chunk_metadata
                     }
-                    for row in rows
-                }
 
             enriched_results = []
             for result in results:
@@ -291,5 +306,12 @@ class SearchService:
 
         # Default deny
         return False
+
+    def cleanup(self) -> None:
+        logger.info("Cleaning up SearchService")
+        try:
+            logger.debug("SearchService cleanup completed")
+        except Exception as e:
+            logger.warning(f"Error during SearchService cleanup: {e}")
 
 search_service = SearchService()
