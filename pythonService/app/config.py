@@ -1,7 +1,6 @@
 import os
+from typing import List
 from functools import lru_cache
-from typing import List, Optional
-
 from pydantic import Field, validator
 from pydantic_settings import BaseSettings
 
@@ -22,10 +21,24 @@ class Settings(BaseSettings):
     # DATABASE CONFIGURATION (Required from environment)
     DATABASE_URL: str = Field(..., description="Postgres DB connection URL")
 
+    OPENAI_API_KEY: str = Field(..., description="OpenAI API key")
+    GOOGLE_API_KEY: str = Field(..., description="Google API key for Gemini")
+
+    EMBEDDING_PROVIDER: str = Field(default="openai", description="openai or local")
+    OPENAI_EMBEDDING_MODEL: str = Field(default="text-embedding-3-small", description="OpenAI embedding model")
+    EMBEDDING_BATCH_SIZE: int = Field(default=100, description="Batch size for embedding generation")
+    EMBEDDING_MAX_RETRIES: int = Field(default=3, description="Max retries for embedding API calls")
+
     # LLM Configuration
-    LLM_MODEL: str = "llama3:8b"
+    LLM_PROVIDER: str = Field(default="gemini", description="gemini or ollama")
+    LLM_MODEL: str = "llama3:8b"  # For running LLM locally
     LLM_TEMPERATURE: float = 0.0
     LLM_MAX_TOKENS: int = 16384
+
+    GEMINI_MODEL: str = Field(default="gemini-2.0-flash-exp", description="Gemini model name")
+    GEMINI_TEMPERATURE: float = Field(default=0.0, description="Gemini temperature")
+    GEMINI_MAX_TOKENS: int = Field(default=8192, description="Gemini max tokens")
+    GEMINI_MAX_RETRIES: int = Field(default=3, description="Max retries for Gemini API calls")
 
     # LOGGING CONFIGURATION
     LOG_LEVEL: str = Field(default="INFO", description="Logging level")
