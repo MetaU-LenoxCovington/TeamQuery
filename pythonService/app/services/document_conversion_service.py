@@ -147,5 +147,13 @@ class DocumentConversionService:
             raise
 
 
-# Singleton instance
+    def cleanup(self) -> None:
+        logger.info("Cleaning up DocumentConversionService")
+        try:
+            self.converter = None
+            self.pipeline_options = None
+            logger.debug("Cleared DocumentConversionService ML models and pipelines")
+        except Exception as e:
+            logger.warning(f"Error during DocumentConversionService cleanup: {e}")
+
 document_conversion_service = DocumentConversionService()
