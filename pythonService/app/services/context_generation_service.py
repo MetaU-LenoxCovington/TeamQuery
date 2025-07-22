@@ -2,6 +2,7 @@ import logging
 from typing import List
 
 from app.services.llm_service import llm_service
+from app.utils.token_utils import token_utils
 
 logger = logging.getLogger(__name__)
 
@@ -41,8 +42,20 @@ Respond only with the succinct context for this chunk. Do not mention it is a ch
 
     async def generate_context_for_chunk(self, chunk: str, document: str) -> str:
         try:
-            prompt = self.contextualizer_prompt.format(document=document, chunk=chunk)
+            truncated_document = self._prepare_document_for_context(document, chunk)
+
+            prompt = self.contextualizer_prompt.format(document=truncated_document, chunk=chunk)
+
+            prompt_tokens = token_utils.count_tokens(prompt)
+            if prompt_tokens > 6000:
+                logger.warning(f"Prompt has {prompt_tokens} tokens, applying additional truncation")
+                max_doc_tokens = 3000
+                truncated_document = token_utils.smart_document_truncation(document, max_doc_tokens)
+                prompt = self.contextualizer_prompt.format(document=truncated_document, chunk=chunk)
+
             context = await llm_service.call_model(prompt)
+
+            context = self._validate_and_truncate_context(context)
 
             logger.debug(
                 f"Generated context for chunk (length {len(chunk)}): {context[:100]}..."
@@ -51,7 +64,58 @@ Respond only with the succinct context for this chunk. Do not mention it is a ch
 
         except Exception as e:
             logger.error(f"Error generating context for chunk: {e}")
+            return self._create_fallback_context(chunk)
+
+    def _prepare_document_for_context(self, document: str, chunk: str) -> str:
+        """
+        Args:
+            document: Full document text
+            chunk: The specific chunk being contextualized
+
+        Returns:
+            Truncated document for context generation
+        """
+        max_document_tokens = 4000
+
+        document_tokens = token_utils.count_tokens(document)
+
+        if document_tokens <= max_document_tokens:
+            return document
+
+        logger.info(f"Document has {document_tokens} tokens, truncating for context generation")
+
+        truncated_document = token_utils.smart_document_truncation(
+            document,
+            max_document_tokens,
+            beginning_ratio=0.6
+        )
+
+        final_tokens = token_utils.count_tokens(truncated_document)
+        logger.info(f"Truncated document to {final_tokens} tokens for context generation")
+
+        return truncated_document
+
+    def _validate_and_truncate_context(self, context: str) -> str:
+        if not context or not context.strip():
             return ""
+
+        context = context.strip()
+
+        context_tokens = token_utils.count_tokens(context)
+        max_context_tokens = 300
+
+        if context_tokens > max_context_tokens:
+            logger.warning(f"Context response has {context_tokens} tokens, truncating to {max_context_tokens}")
+            context = token_utils.truncate_to_token_limit(context, max_context_tokens)
+
+        return context
+
+    def _create_fallback_context(self, chunk: str) -> str:
+        sentences = chunk.split('.')
+        if sentences and len(sentences[0]) > 10:
+            return f"This content discusses {sentences[0][:100].strip().lower()}."
+        else:
+            return f"This content covers information from the document."
 
     async def generate_contexts_for_chunks(
         self, chunks: List[str], document: str
@@ -114,5 +178,11 @@ Respond only with the succinct context for this chunk. Do not mention it is a ch
         # No context found
         return ""
 
+    def cleanup(self) -> None:
+        logger.info("Cleaning up ContextGenerationService")
+        try:
+            logger.debug("ContextGenerationService cleanup completed")
+        except Exception as e:
+            logger.warning(f"Error during ContextGenerationService cleanup: {e}")
 
 context_generation_service = ContextGenerationService()
