@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import List, Optional, Dict, Any
 import logging
+from fastapi import BackgroundTasks
 
 from app.services.search_index_builder_service import search_index_builder
 from app.services.search_service import search_service
@@ -174,6 +175,52 @@ async def rag_query(query: RAGQuery):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.post("/rebuild-index", response_model=Dict[str, Any])
+async def rebuild_search_index(request: IndexBuildRequest):
+    try:
+        logger.info(f"Force rebuilding search index for organization {request.organization_id}")
+
+        org_indexes = await search_index_builder.build_or_update_index(
+            request.organization_id,
+            force_rebuild=True
+        )
+
+        return {
+            "message": f"Index rebuilt successfully for organization {request.organization_id}",
+            "stats": {
+                "chunk_count": org_indexes.chunk_count,
+                "document_count": org_indexes.document_count,
+                "last_updated": org_indexes.last_updated.isoformat() if org_indexes.last_updated else None,
+                "has_hnsw": org_indexes.hnsw_index is not None
+            }
+        }
+
+    except Exception as e:
+        logger.error(f"Failed to rebuild search index: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/full-reprocess", response_model=Dict[str, str])
+async def full_reprocess_organization(
+    request: IndexBuildRequest,
+    background_tasks: BackgroundTasks
+):
+    """
+    TODO: Trigger a full reprocessing of all documents for an organization
+    downloading from S3 and running the full pipeline.
+    """
+    logger.warning("Full re-process endpoint is a placeholder and not yet implemented.")
+
+    background_tasks.add_task(
+        search_index_builder.trigger_full_reprocess,
+        request.organization_id
+    )
+
+    return {
+        "message": f"Full re-processing task queued for organization {request.organization_id}. NOTE: This is not yet implemented."
+    }
+
+
 @router.get("/index-status/{organization_id}")
 async def get_index_status(organization_id: str):
     try:
@@ -182,16 +229,19 @@ async def get_index_status(organization_id: str):
         if not org_indexes:
             return {
                 "organization_id": organization_id,
+                "has_indexes": False,
                 "status": "not_found",
                 "message": "No indexes found for this organization"
             }
 
         return {
             "organization_id": organization_id,
+            "has_indexes": True,
             "status": "ready" if not org_indexes.is_building else "building",
             "chunk_count": org_indexes.chunk_count,
             "document_count": org_indexes.document_count,
             "last_updated": org_indexes.last_updated.isoformat() if org_indexes.last_updated else None,
+            "total_nodes": org_indexes.hnsw_index.size if org_indexes.hnsw_index else 0,
             "indexes": {
                 "hnsw": {
                     "status": "ready" if org_indexes.hnsw_index else "not_built",
@@ -218,17 +268,18 @@ async def get_all_index_stats():
 
 
 @router.delete("/index/{organization_id}")
-async def destroy_index(organization_id: str):
+async def destroy_index(organization_id: str, persist: bool = False):
     """
-    Destroy search indexes for an organization
+    Destroy search indexes for an organization.
+    Optionally persist the index to disk before destroying.
     """
     try:
         logger.info(f"Destroying index for organization {organization_id}")
 
-        success = search_index_builder.destroy_indexes(organization_id)
+        success = search_index_builder.destroy_indexes(organization_id, persist_to_disk=persist)
 
         if success:
-            return {"message": f"Index destroyed for organization {organization_id}"}
+            return {"message": f"Index destroyed for organization {organization_id}", "persisted": persist}
         else:
             return {"message": f"No indexes found for organization {organization_id}"}
 
