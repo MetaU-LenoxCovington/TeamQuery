@@ -33,3 +33,8 @@ venv
 /src/generated/prisma
 frequency_dictionary_en_82_765.txt
 pythonService/app/models/*
+
+docs
+temp_uploads
+pythonService/tests/assets/*
+.env.test
