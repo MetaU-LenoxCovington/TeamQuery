@@ -111,6 +111,17 @@ Return metadata in this exact JSON format:
                 end = cleaned.find("```", start)
                 if end > start:
                     cleaned = cleaned[start:end].strip()
+            else:
+                start = cleaned.find("{")
+                end = cleaned.rfind("}") + 1
+                if start >= 0 and end > start:
+                    cleaned = cleaned[start:end].strip()
+
+            if not cleaned.startswith("{"):
+                import re
+                json_match = re.search(r'\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}', cleaned, re.DOTALL)
+                if json_match:
+                    cleaned = json_match.group(0)
 
             metadata = json.loads(cleaned)
 
@@ -118,6 +129,46 @@ Return metadata in this exact JSON format:
 
         except json.JSONDecodeError as e:
             logger.error(f"Failed to parse metadata JSON: {response[:200]}... Error: {e}")
+            return self._extract_fallback_metadata(response)
+        except Exception as e:
+            logger.error(f"Unexpected error parsing metadata: {e}")
+            return self._get_default_metadata()
+
+    def _extract_fallback_metadata(self, response: str) -> Dict[str, Any]:
+        try:
+            import re
+
+            keywords = []
+            topics = []
+            entities = []
+
+            keyword_match = re.search(r'"keywords":\s*\[(.*?)\]', response, re.DOTALL)
+            if keyword_match:
+                keywords_str = keyword_match.group(1)
+                keywords = [k.strip().strip('"') for k in keywords_str.split(',') if k.strip()]
+
+            topic_match = re.search(r'"topics":\s*\[(.*?)\]', response, re.DOTALL)
+            if topic_match:
+                topics_str = topic_match.group(1)
+                topics = [t.strip().strip('"') for t in topics_str.split(',') if t.strip()]
+
+            entity_match = re.search(r'"entities":\s*\[(.*?)\]', response, re.DOTALL)
+            if entity_match:
+                entities_str = entity_match.group(1)
+                entities = [e.strip().strip('"') for e in entities_str.split(',') if e.strip()]
+
+            doc_type_match = re.search(r'"document_type":\s*"([^"]*)"', response)
+            doc_type = doc_type_match.group(1) if doc_type_match else "unknown"
+
+            return {
+                "keywords": keywords[:10],
+                "topics": topics[:5],
+                "entities": entities[:20],
+                "document_type": doc_type
+            }
+
+        except Exception as e:
+            logger.error(f"Fallback metadata extraction failed: {e}")
             return self._get_default_metadata()
 
     def _validate_metadata(self, metadata: Dict[str, Any]) -> Dict[str, Any]:
@@ -152,5 +203,14 @@ Return metadata in this exact JSON format:
             "entities": [],
             "document_type": "unknown"
         }
+    def cleanup(self) -> None:
+        """
+        Cleanup method to clear any cached data.
+        """
+        logger.info("Cleaning up MetadataExtractionService")
+        try:
+            logger.debug("MetadataExtractionService cleanup completed")
+        except Exception as e:
+            logger.warning(f"Error during MetadataExtractionService cleanup: {e}")
 
 metadata_extraction_service = MetadataExtractionService()
