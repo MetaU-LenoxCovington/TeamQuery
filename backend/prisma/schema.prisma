@@ -48,8 +48,8 @@ model Organization {
   adminUserId String
   adminUser User @relation("AdminOrganizations", fields: [adminUserId], references: [id])
 
-  createdBy String
-  creator User @relation("CreatedOrganizations", fields: [createdBy], references: [id])
+  createdBy String?
+  creator User? @relation("CreatedOrganizations", fields: [createdBy], references: [id])
 
   memberships       OrganizationMembership[]
   groups             Group[]
