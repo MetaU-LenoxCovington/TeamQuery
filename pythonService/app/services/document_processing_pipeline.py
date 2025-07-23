@@ -5,7 +5,7 @@ from datetime import datetime
 import asyncio
 
 from app.services.document_conversion_service import DocumentConversionService
-from app.services.text_cleaning_service import get_text_cleaning_service
+# from app.services.text_cleaning_service import get_text_cleaning_service
 from app.services.chunking_service import chunking_service
 from app.services.metadata_extraction_service import metadata_extraction_service
 from app.services.context_generation_service import context_generation_service
@@ -58,7 +58,8 @@ class DocumentProcessingPipelineService:
                 raise ValueError("Document conversion failed - no content extracted")
 
             logger.info("Step 2: Cleaning text")
-            cleaned_text = await self._clean_text(markdown_content)
+            # cleaned_text = await self._clean_text(markdown_content)
+            cleaned_text = markdown_content
 
             logger.info("Step 3: Creating semantic chunks")
             chunks = await self._create_chunks(cleaned_text, document_metadata.get("title", ""))
@@ -108,10 +109,12 @@ class DocumentProcessingPipelineService:
         from pathlib import Path
         return self.document_converter.process_document(Path(file_path))
 
+    """
     async def _clean_text(self, text: str) -> str:
         if self.text_cleaner is None:
             self.text_cleaner = get_text_cleaning_service()
         return self.text_cleaner.clean_document_with_placeholders(text)
+    """
 
     async def _create_chunks(self, text: str, document_title: str) -> List[Dict[str, Any]]:
         chunks_text = await chunking_service.chunk_document(text)
