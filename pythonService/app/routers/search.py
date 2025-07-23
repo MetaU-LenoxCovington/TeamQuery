@@ -61,6 +61,7 @@ class RAGResponse(BaseModel):
 
 class IndexBuildRequest(BaseModel):
     organization_id: str
+    force_rebuild: bool = False
 
 
 class IndexStatus(BaseModel):
@@ -141,38 +142,100 @@ async def rag_query(query: RAGQuery):
     """
     Execute a RAG query: search + context retrieval + LLM generation
     """
+    import time
+    from app.services.llm_service import llm_service
+
+    start_time = time.time()
+
     try:
         logger.info(f"RAG query: {query.query} in org {query.organization_id}")
 
-        # TODO: Implement actual RAG pipeline
-        # 1. Search for relevant chunks
-        # 2. Retrieve context
-        # 3. Generate response with LLM
-        # 4. Format citations
+        enhanced_queries = await llm_service.enhance_query(
+            query.query,
+            conversation_history=[]  # TODO: Add conversation history support
+        )
+        logger.info(f"Enhanced queries: {enhanced_queries}")
 
-        # Mock response for now
-        mock_sources = [
-            RAGSource(
-                chunk_id="chunk_1",
-                document_id="doc_1",
-                document_title="Sample Document",
-                content="Relevant content from the document...",
-                page_number=1,
-                relevance_score=0.85
+        all_results = []
+
+        for enhanced_query in enhanced_queries:
+            search_result = await search_service.search(
+                query=enhanced_query,
+                organization_id=query.organization_id,
+                filters=query.filters,
+                k=10
             )
-        ]
+
+            if search_result.get("results"):
+                all_results.extend(search_result["results"])
+
+        unique_results = {}
+        if all_results:
+            seen_chunks = {}
+            for result in all_results:
+                chunk_id = result["chunk_id"]
+                if chunk_id not in seen_chunks or result["score"] > seen_chunks[chunk_id]["score"]:
+                    seen_chunks[chunk_id] = result
+
+            unique_results = sorted(seen_chunks.values(), key=lambda x: x["score"], reverse=True)[:15]
+
+        context_chunks = []
+        for result in unique_results:
+            context_chunks.append({
+                "chunk_id": result["chunk_id"],
+                "document_id": result["document_id"],
+                "content": result["content"],
+                "score": result["score"],
+                "metadata": result["metadata"]
+            })
+
+        selected_context = await llm_service.select_context(
+            query.query,
+            context_chunks
+        )
+
+        selected_context = selected_context[:query.max_context_chunks]
+
+        generation_result = await llm_service.generate_answer(
+            query.query,
+            selected_context,
+            conversation_history=[]  # TODO: Add conversation history support
+        )
+
+        rag_sources = []
+        for source_data in generation_result["sources"]:
+            rag_sources.append(RAGSource(
+                chunk_id=source_data["chunk_id"],
+                document_id=source_data["document_id"],
+                document_title=source_data["document_title"],
+                content=source_data["content"],
+                page_number=source_data.get("page_number"),
+                relevance_score=source_data["relevance_score"]
+            ))
+
+        processing_time = time.time() - start_time
+
+        logger.info(f"RAG query completed in {processing_time:.2f}s with {len(rag_sources)} sources")
 
         return RAGResponse(
             query=query.query,
-            answer="Based on the documents, here is the answer to your question...",
-            sources=mock_sources,
+            answer=generation_result["answer"],
+            sources=rag_sources,
             conversation_id=query.conversation_id,
-            processing_time=2.45
+            processing_time=processing_time
         )
 
     except Exception as e:
-        logger.error(f"RAG query failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        processing_time = time.time() - start_time
+        logger.error(f"RAG query failed after {processing_time:.2f}s: {e}")
+
+        return RAGResponse(
+            query=query.query,
+            answer="I encountered an error while processing your question. Please try again or rephrase your query.",
+            sources=[],
+            conversation_id=query.conversation_id,
+            processing_time=processing_time
+        )
 
 
 @router.post("/rebuild-index", response_model=Dict[str, Any])
