@@ -53,13 +53,6 @@ async def setup_test_database():
     yield
 
     try:
-        from app.services.cleanup_manager import cleanup_manager
-        await cleanup_manager.cleanup_all_services()
-        logger.info("Completed cleanup of all singleton services")
-    except Exception as e:
-        logger.error(f"Error during service cleanup: {e}")
-
-    try:
         conn = await asyncpg.connect(settings.DATABASE_URL.replace("/teamquery_test", "/postgres"))
         await conn.execute("DROP DATABASE teamquery_test WITH (FORCE)")
         await conn.close()
