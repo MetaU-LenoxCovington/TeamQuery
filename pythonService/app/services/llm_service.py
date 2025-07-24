@@ -209,6 +209,14 @@ class LLMService:
                         if isinstance(idx, int) and 1 <= idx <= len(candidates):
                             selected_chunks.append(candidates[idx - 1])
 
+                        if len(selected_chunks) < 2:
+                            # add the next most relevant chunk that is not already selected
+                            sorted_candidates = sorted(candidates, key=lambda x: x['score'], reverse=True)
+                            for chunk in sorted_candidates:
+                                if chunk not in selected_chunks:
+                                    selected_chunks.append(chunk)
+                                    break
+
                     if not selected_chunks:
                         logger.info("LLM determined no chunks are relevant - returning empty context")
                         # return at least two chunk
