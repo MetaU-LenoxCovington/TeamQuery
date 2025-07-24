@@ -211,7 +211,8 @@ class LLMService:
 
                     if not selected_chunks:
                         logger.info("LLM determined no chunks are relevant - returning empty context")
-                        return []
+                        # return at least two chunk
+                        return sorted(candidates[:2], key=lambda x: x['score'], reverse=True)
 
                     return selected_chunks[:5]
                 else:
