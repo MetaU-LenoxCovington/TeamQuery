@@ -1,111 +1,196 @@
 import { EventEmitter } from 'events';
-import { prisma } from '../lib/prisma';
 import { logger } from '../utils/logger';
 
-// TODO: Replace when implementing actual search index
-// Will likely change this to reference multiple search indexes
-interface OrganizationIndex {
-    organizationId: string;
-    documents: Map<string, any>;
-    lastUpdated: Date;
-    isBuilding: boolean;
+interface IndexStatus {
+  organizationId: string;
+  status: 'building' | 'ready' | 'failed' | 'not_found';
+  isBuilding: boolean;
 }
 
 export class SearchIndexManager extends EventEmitter {
-    private indexes = new Map<string, OrganizationIndex>();
-    private buildingPromises = new Map<string, Promise<void>>();
+  private indexStatuses = new Map<string, IndexStatus>();
+  private buildingPromises = new Map<string, Promise<void>>();
+  private pythonServiceUrl: string;
 
-    async buildIndex(organizationId: string): Promise<void> {
-        if(this.buildingPromises.has(organizationId)) {
-            return this.buildingPromises.get(organizationId)!;
+  constructor() {
+    super();
+    this.pythonServiceUrl = process.env.PYTHON_SERVICE_URL || 'http://localhost:8001';
+  }
+
+  async buildIndex(organizationId: string, forceRebuild: boolean = false): Promise<any> {
+    if (this.buildingPromises.has(organizationId)) {
+      await this.buildingPromises.get(organizationId)!;
+      // After waiting, get the status to return proper response
+      const status = await this.getIndexStatus(organizationId);
+      return {
+        message: `Index already built for organization ${organizationId}`,
+        stats: {
+          chunk_count: status.chunk_count,
+          document_count: status.document_count,
+          last_updated: status.last_updated,
+          has_hnsw: status.status === 'ready'
         }
-
-        const buildPromise = this.buildIndexInternal(organizationId);
-        this.buildingPromises.set(organizationId, buildPromise);
-
-        try {
-            await buildPromise;
-        } finally {
-            this.buildingPromises.delete(organizationId)
-        }
+      };
     }
 
-    private async buildIndexInternal(organizationId: string): Promise<void> {
+    const buildPromise = this.sendBuildIndexRequest(organizationId, forceRebuild);
+    this.buildingPromises.set(organizationId, buildPromise);
 
-        const organization = await prisma.organization.findUnique({
-            where: { id: organizationId },
-            select: {
-                lastDataChange: true,
-                lastIndexUpdate: true,
-                currentWordCount: true,
-                maxWords: true
-            }
+    try {
+      return await buildPromise;
+    } finally {
+      this.buildingPromises.delete(organizationId);
+    }
+  }
+
+  private async sendBuildIndexRequest(organizationId: string, forceRebuild: boolean = false): Promise<any> {
+    logger.info(`Building search index for organization ${organizationId}`);
+
+    this.indexStatuses.set(organizationId, {
+      organizationId,
+      status: 'building',
+      isBuilding: true
+    });
+
+    try {
+      const requestBody = {
+        organization_id: organizationId,
+        force_rebuild: forceRebuild
+      };
+
+      const response = await fetch(`${this.pythonServiceUrl}/api/search/build-index`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestBody)
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Python service responded with ${response.status}: ${errorText}`);
+      }
+
+      const result = await response.json();
+
+      this.indexStatuses.set(organizationId, {
+        organizationId,
+        status: 'ready',
+        isBuilding: false
+      });
+
+      logger.info(`Index built successfully for organization ${organizationId}`, {
+        stats: result.stats
+      });
+
+      this.emit('indexBuilt', organizationId, result.stats);
+
+      return result;
+
+    } catch (error: any) {
+      this.indexStatuses.set(organizationId, {
+        organizationId,
+        status: 'failed',
+        isBuilding: false
+      });
+
+      logger.error(`Failed to build index for organization ${organizationId}:`, error);
+      throw error;
+    }
+  }
+
+  async destroyIndex(organizationId: string): Promise<void> {
+    logger.info(`Destroying search index for organization ${organizationId}`);
+
+    try {
+      const response = await fetch(`${this.pythonServiceUrl}/api/search/index/${organizationId}`, {
+        method: 'DELETE'
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        logger.warn(`Failed to destroy index in Python service: ${response.status}: ${errorText}`);
+      } else {
+        const result = await response.json();
+        logger.info(`Index destroyed for organization ${organizationId}: ${result.message}`);
+      }
+
+    } catch (error: any) {
+      logger.error(`Error calling Python service to destroy index for ${organizationId}:`, error);
+      // Continue with local cleanup even if Python service call fails
+    }
+
+    this.indexStatuses.delete(organizationId);
+    this.emit('indexDestroyed', organizationId);
+  }
+
+  async hasIndex(organizationId: string): Promise<boolean> {
+    const status = await this.getIndexStatus(organizationId);
+    return status.status === 'ready';
+  }
+
+  isBuilding(organizationId: string): boolean {
+    const localStatus = this.indexStatuses.get(organizationId);
+    return localStatus?.isBuilding || false;
+  }
+
+  async getIndexStatus(organizationId: string): Promise<any> {
+    try {
+      const response = await fetch(`${this.pythonServiceUrl}/api/search/index-status/${organizationId}`);
+
+      if (!response.ok) {
+        const notFoundStatus = {
+          organization_id: organizationId,
+          status: 'not_found',
+          chunk_count: 0,
+          document_count: 0,
+          message: 'No indexes found for this organization'
+        };
+
+        this.indexStatuses.set(organizationId, {
+          organizationId,
+          status: 'not_found',
+          isBuilding: false
         });
 
-        if (!organization) {
-            // TODO: create error class that fits this error type
-            throw new Error(`Organization ${organizationId} not found`);
-        }
+        return notFoundStatus;
+      }
 
-        const existingIndex = this.indexes.get(organizationId);
-        const needsRebuild = !existingIndex || !organization.lastIndexUpdate || organization.lastDataChange > organization.lastIndexUpdate;
+      const result = await response.json();
 
-        if (!needsRebuild && existingIndex) {
-            logger.info(`Index for ${organizationId} already up to date`);
-            return;
-        }
+      this.indexStatuses.set(organizationId, {
+        organizationId,
+        status: result.status === 'building' ? 'building' :
+                result.status === 'ready' ? 'ready' : 'not_found',
+        isBuilding: result.status === 'building'
+      });
 
-        // TODO: replace with actual search indexes
-        const index: OrganizationIndex = {
-            organizationId,
-            documents: new Map(),
-            lastUpdated: new Date(),
-            isBuilding: true
-        }
+      return result;
 
-        this.indexes.set(organizationId, index);
+    } catch (error: any) {
+      logger.error(`Failed to get index status for ${organizationId}:`, error);
+      const failedStatus = {
+        organization_id: organizationId,
+        status: 'failed',
+        chunk_count: 0,
+        document_count: 0,
+        message: 'Failed to get index status'
+      };
 
-        try{
-            // TODO: add fetch to get all the data to build the search indexes
-            const documents: any = [];
-            // TODO: actually build the search indexes
+      this.indexStatuses.set(organizationId, {
+        organizationId,
+        status: 'failed',
+        isBuilding: false
+      });
 
-            await prisma.organization.update({
-                where: { id: organizationId },
-                data: { lastIndexUpdate: new Date() }
-            });
-
-            logger.info(`Index for ${organizationId} built with ${documents.size} documents`);
-            this.emit('indexBuilt', organizationId, documents.length);
-
-        } catch (error) {
-            logger.error(`Failed to build index for ${organizationId}: ${error}`);
-            this.indexes.delete(organizationId);
-            throw error;
-        }
+      return failedStatus;
     }
+  }
 
-    destroyIndex(organizationId: string): void {
-        if(this.indexes.has(organizationId)) {
-            logger.info(`Destroying index for ${organizationId}`);
-            this.indexes.delete(organizationId);
-            this.emit('indexDestroyed', organizationId);
-        }
-    }
+  getActiveIndexes(): string[] {
+    return Array.from(this.indexStatuses.entries())
+      .filter(([_, status]) => status.status === 'ready')
+      .map(([orgId, _]) => orgId);
+  }
 
-    getIndex(organizationId: string): OrganizationIndex | undefined {
-        return this.indexes.get(organizationId);
-    }
-
-    hasIndex(organizationId: string): boolean {
-        return this.indexes.has(organizationId);
-    }
-
-    getActiveIndexes(): string[] {
-        return Array.from(this.indexes.keys());
-    }
-
-    async search(organizationId: string, query: string, accessibleDocumentIds: string[]): Promise<any> {
-        // TODO: implement search to return documents/text chunks relevant to the query
-    }
 }
