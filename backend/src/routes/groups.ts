@@ -1,9 +1,10 @@
 import { Router } from "express";
 import { groupController } from "../controllers/groupController";
+import { documentController } from "../controllers/documentController";
 import { authenticateToken } from "../middleware/auth";
 
 const createGroupRoutes = () => {
-  const router = Router();
+  const router = Router({ mergeParams: true });
 
   // Group CRUD
   router.post('/', authenticateToken, groupController.createGroup);
@@ -20,7 +21,10 @@ const createGroupRoutes = () => {
   // Bulk transfer members between groups
   router.post('/transfer-members', authenticateToken, groupController.transferMembersBetweenGroups);
 
+  // Group documents
+  router.get('/:groupId/documents', authenticateToken, documentController.getDocumentsByGroup);
+
   return router;
 };
 
-export default createGroupRoutes; 
+export default createGroupRoutes;
