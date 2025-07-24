@@ -38,3 +38,4 @@ docs
 temp_uploads
 pythonService/tests/assets/*
 .env.test
+engDocs
