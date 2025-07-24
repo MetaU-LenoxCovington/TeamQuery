@@ -10,6 +10,8 @@ import createAuthRoutes from './routes/auth';
 import createOrganizationRoutes from './routes/organizations';
 import createInvitationRoutes from './routes/invitations';
 import createGroupRoutes from './routes/groups';
+import createRagRoutes from './routes/rag';
+import createDocumentRoutes from './routes/documents';
 import { logger } from './utils/logger';
 
 const app = express();
@@ -47,6 +49,8 @@ app.use('/api/auth', createAuthRoutes());
 app.use('/api/organizations', createOrganizationRoutes());
 app.use('/api/invitations', createInvitationRoutes());
 app.use('/api/organizations/:orgId/groups', createGroupRoutes());
+app.use('/api/rag', createRagRoutes());
+app.use('/api/documents', createDocumentRoutes());
 
 // Health check
 app.get('/health', (_req, res) => {
