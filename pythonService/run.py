@@ -15,7 +15,6 @@ if __name__ == "__main__":
     os.environ.setdefault("DEBUG", "true")
     os.environ.setdefault("HOST", "0.0.0.0")
     os.environ.setdefault("PORT", "8001")
-    os.environ.setdefault("DATABASE_URL", "postgresql://user:password@localhost:5432/teamquery")
 
     uvicorn.run(
         "app.main:app",
