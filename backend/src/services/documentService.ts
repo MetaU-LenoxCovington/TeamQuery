@@ -22,7 +22,7 @@ export interface UpdateDocumentRequest {
 export class DocumentService {
   constructor() {}
   private permissionService = new PermissionService();
-  private pythonServiceUrl: string = process.env.PYTHON_SERVICE_URL || 'http://localhost:8000'
+  private pythonServiceUrl: string = process.env.PYTHON_SERVICE_URL || 'http://localhost:8001'
 
   async uploadDocument(
     userId: string,
