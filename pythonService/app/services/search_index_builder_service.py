@@ -141,11 +141,6 @@ class SearchIndexBuilderService:
                 #     organization_id, chunks_data
                 # )
 
-                # TODO: Build Inverted index
-                # org_indexes.inverted_index = await self._build_inverted_index(
-                #     organization_id, chunks_data
-                # )
-
                 org_indexes.chunk_count = len(chunks_data)
                 org_indexes.document_count = len(
                     set(c["document_id"] for c in chunks_data)
