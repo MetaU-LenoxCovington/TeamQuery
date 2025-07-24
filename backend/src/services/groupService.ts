@@ -27,14 +27,14 @@ export interface UpdateMemberPermissionsRequest {
   canDelete?: boolean;
 }
 
+const permissionService = new PermissionService();
+
 export class GroupService {
-  constructor(
-    private permissionService: PermissionService
-  ) {}
+  constructor() {}
 
   async createGroup(userId: string, organizationId: string, data: CreateGroupRequest) {
     // Check permissions - only admins and managers can create groups
-    const permissions = await this.permissionService.getUserPermissions(userId, organizationId);
+    const permissions = await permissionService.getUserPermissions(userId, organizationId);
     if (!permissions.canManageUsers) {
       throw new PermissionError('Insufficient permissions to create groups');
     }
@@ -70,7 +70,7 @@ export class GroupService {
 
   async updateGroup(userId: string, organizationId: string, groupId: string, data: UpdateGroupRequest) {
 
-    const permissions = await this.permissionService.getUserPermissions(userId, organizationId);
+    const permissions = await permissionService.getUserPermissions(userId, organizationId);
     if (!permissions.canManageUsers) {
       throw new PermissionError('Insufficient permissions to update groups');
     }
@@ -117,7 +117,7 @@ export class GroupService {
 
   async deleteGroup(userId: string, organizationId: string, groupId: string) {
 
-    const permissions = await this.permissionService.getUserPermissions(userId, organizationId);
+    const permissions = await permissionService.getUserPermissions(userId, organizationId);
     if (!permissions.canManageUsers) {
       throw new PermissionError('Insufficient permissions to delete groups');
     }
@@ -159,7 +159,7 @@ export class GroupService {
   }
 
   async getOrganizationGroups(userId: string, organizationId: string) {
-    const permissions = await this.permissionService.getUserPermissions(userId, organizationId);
+    const permissions = await permissionService.getUserPermissions(userId, organizationId);
     if (!(permissions.role === 'MEMBER' || permissions.role === 'MANAGER' || permissions.role === 'ADMIN')) {
       throw new PermissionError('Organization membership required');
     }
@@ -201,7 +201,7 @@ export class GroupService {
 
   async getGroupMembers(userId: string, organizationId: string, groupId: string) {
     // Check permissions - members can view, but managers+ can see more details
-    const permissions = await this.permissionService.getUserPermissions(userId, organizationId);
+    const permissions = await permissionService.getUserPermissions(userId, organizationId);
     if (!(permissions.role === 'MEMBER' || permissions.role === 'MANAGER' || permissions.role === 'ADMIN')) {
       throw new PermissionError('Organization membership required');
     }
@@ -246,7 +246,7 @@ export class GroupService {
     groupId: string,
     data: AddMembersRequest
   ) {
-    const permissions = await this.permissionService.getUserPermissions(userId, organizationId);
+    const permissions = await permissionService.getUserPermissions(userId, organizationId);
     if (!permissions.canManageUsers) {
       throw new PermissionError('Insufficient permissions to manage group members');
     }
@@ -311,7 +311,7 @@ export class GroupService {
     groupId: string,
     targetUserId: string
   ) {
-    const permissions = await this.permissionService.getUserPermissions(userId, organizationId);
+    const permissions = await permissionService.getUserPermissions(userId, organizationId);
     if (!permissions.canManageUsers) {
       throw new PermissionError('Insufficient permissions to manage group members');
     }
@@ -353,7 +353,7 @@ export class GroupService {
     permissions: UpdateMemberPermissionsRequest
   ) {
 
-    const userPermissions = await this.permissionService.getUserPermissions(userId, organizationId);
+    const userPermissions = await permissionService.getUserPermissions(userId, organizationId);
     if (!userPermissions.canManageUsers) {
       throw new PermissionError('Insufficient permissions to manage group member permissions');
     }
@@ -403,7 +403,7 @@ export class GroupService {
     toGroupId: string,
     memberIds: string[]
   ) {
-    const permissions = await this.permissionService.getUserPermissions(userId, organizationId);
+    const permissions = await permissionService.getUserPermissions(userId, organizationId);
     if (!permissions.canManageUsers) {
       throw new PermissionError('Insufficient permissions to transfer group members');
     }

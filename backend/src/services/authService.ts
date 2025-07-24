@@ -70,11 +70,21 @@ export class AuthService {
 				});
 
 				// Create default group
-				await tx.group.create({
+				const defaultGroup = await tx.group.create({
 					data: {
 						name: 'General',
 						description: 'Default group for all members',
 						organizationId: organization.id,
+					}
+				});
+
+				// Add user to the default group
+				await tx.groupMembership.create({
+					data: {
+						userId: user.id,
+						groupId: defaultGroup.id,
+						canUpload: true,
+						canDelete: true,
 					}
 				});
 			}

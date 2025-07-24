@@ -1,17 +1,18 @@
 import { Request, Response, NextFunction } from 'express';
 import { OrganizationService } from '../services/organizationService';
 import { InvitationService } from '../services/invitationService';
+import { sessionService } from '../services/sessionServiceSingleton';
+
+const organizationService = new OrganizationService(sessionService);
+const invitationService = new InvitationService();
 
 export class OrganizationController {
-  constructor(
-    private organizationService: OrganizationService,
-    private invitationService: InvitationService
-  ) {}
+  constructor() {}
 
   // POST /api/organizations
   async create(req: Request, res: Response, next: NextFunction) {
     try {
-      const organization = await this.organizationService.createOrganization(
+      const organization = await organizationService.createOrganization(
         req.user!.userId,
         req.body
       );
@@ -24,7 +25,7 @@ export class OrganizationController {
   // GET /api/organizations
   async getUserOrganizations(req: Request, res: Response, next: NextFunction) {
     try {
-      const organizations = await this.organizationService.getUserOrganizations(
+      const organizations = await organizationService.getUserOrganizations(
         req.user!.userId
       );
       res.json({ success: true, data: organizations });
@@ -36,7 +37,7 @@ export class OrganizationController {
   // PUT /api/organizations/:id
   async update(req: Request, res: Response, next: NextFunction) {
     try {
-      const organization = await this.organizationService.updateOrganization(
+      const organization = await organizationService.updateOrganization(
         req.user!.userId,
         req.params.id,
         req.body
@@ -50,7 +51,7 @@ export class OrganizationController {
   // DELETE /api/organizations/:id
   async delete(req: Request, res: Response, next: NextFunction) {
     try {
-      await this.organizationService.deleteOrganization(
+      await organizationService.deleteOrganization(
         req.user!.userId,
         req.params.id
       );
@@ -63,7 +64,7 @@ export class OrganizationController {
   // GET /api/organizations/:id/members
   async getMembers(req: Request, res: Response, next: NextFunction) {
     try {
-      const members = await this.organizationService.getOrganizationMembers(
+      const members = await organizationService.getOrganizationMembers(
         req.user!.userId,
         req.params.id
       );
@@ -77,7 +78,7 @@ export class OrganizationController {
   async updateMemberRole(req: Request, res: Response, next: NextFunction) {
     try {
       const { role, permissions } = req.body;
-      const membership = await this.organizationService.updateMemberRole(
+      const membership = await organizationService.updateMemberRole(
         req.user!.userId,
         req.params.id,
         req.params.memberId,
@@ -93,7 +94,7 @@ export class OrganizationController {
   // DELETE /api/organizations/:id/members/:memberId
   async removeMember(req: Request, res: Response, next: NextFunction) {
     try {
-      await this.organizationService.removeMember(
+      await organizationService.removeMember(
         req.user!.userId,
         req.params.id,
         req.params.memberId
@@ -108,7 +109,7 @@ export class OrganizationController {
   async transferAdmin(req: Request, res: Response, next: NextFunction) {
     try {
       const { newAdminId } = req.body;
-      await this.organizationService.transferAdminRole(
+      await organizationService.transferAdminRole(
         req.user!.userId,
         req.params.id,
         newAdminId
@@ -122,7 +123,7 @@ export class OrganizationController {
   // POST /api/organizations/:id/leave
   async leave(req: Request, res: Response, next: NextFunction) {
     try {
-      await this.organizationService.leaveOrganization(
+      await organizationService.leaveOrganization(
         req.user!.userId,
         req.params.id
       );
@@ -135,7 +136,7 @@ export class OrganizationController {
   // POST /api/organizations/:id/invitations
   async inviteUser(req: Request, res: Response, next: NextFunction) {
     try {
-      const invitation = await this.invitationService.inviteUser(
+      const invitation = await invitationService.inviteUser(
         req.user!.userId,
         req.params.id,
         req.body
@@ -149,7 +150,7 @@ export class OrganizationController {
   // GET /api/organizations/:id/invitations
   async getInvitations(req: Request, res: Response, next: NextFunction) {
     try {
-      const invitations = await this.invitationService.getOrganizationInvitations(
+      const invitations = await invitationService.getOrganizationInvitations(
         req.user!.userId,
         req.params.id
       );
@@ -162,7 +163,7 @@ export class OrganizationController {
   // DELETE /api/organizations/:id/invitations/:invitationId
   async cancelInvitation(req: Request, res: Response, next: NextFunction) {
     try {
-      await this.invitationService.cancelInvitation(
+      await invitationService.cancelInvitation(
         req.user!.userId,
         req.params.invitationId
       );
@@ -175,7 +176,7 @@ export class OrganizationController {
   // POST /api/organizations/:id/invitations/:invitationId/resend
   async resendInvitation(req: Request, res: Response, next: NextFunction) {
     try {
-      const invitation = await this.invitationService.resendInvitation(
+      const invitation = await invitationService.resendInvitation(
         req.user!.userId,
         req.params.invitationId
       );
@@ -186,14 +187,4 @@ export class OrganizationController {
   }
 }
 
-import { sessionService } from '../services/sessionServiceSingleton';
-import { PermissionService } from '../services/permissionService';
-
-const permissionService = new PermissionService();
-const organizationService = new OrganizationService(permissionService, sessionService);
-const invitationService = new InvitationService(permissionService);
-
-export const organizationController = new OrganizationController(
-  organizationService,
-  invitationService
-);
+export const organizationController = new OrganizationController();

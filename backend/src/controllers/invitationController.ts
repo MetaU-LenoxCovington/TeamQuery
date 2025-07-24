@@ -1,15 +1,15 @@
 import { Request, Response, NextFunction } from 'express';
 import { InvitationService } from '../services/invitationService';
 
+const invitationService = new InvitationService();
+
 export class InvitationController {
-  constructor(
-    private invitationService: InvitationService
-  ) {}
+  constructor() {}
 
   // GET /api/invitations
   async getPendingInvitations(req: Request, res: Response, next: NextFunction) {
     try {
-      const invitations = await this.invitationService.getUserPendingInvitations(
+      const invitations = await invitationService.getUserPendingInvitations(
         req.user!.email
       );
       res.json({ success: true, data: invitations });
@@ -21,7 +21,7 @@ export class InvitationController {
   // POST /api/invitations/:id/accept
   async acceptInvitation(req: Request, res: Response, next: NextFunction) {
     try {
-      const organization = await this.invitationService.acceptInvitation(
+      const organization = await invitationService.acceptInvitation(
         req.user!.userId,
         req.params.id
       );
@@ -38,7 +38,7 @@ export class InvitationController {
   // POST /api/invitations/:id/decline
   async declineInvitation(req: Request, res: Response, next: NextFunction) {
     try {
-      await this.invitationService.declineInvitation(
+      await invitationService.declineInvitation(
         req.user!.userId,
         req.params.id
       );
@@ -52,9 +52,4 @@ export class InvitationController {
   }
 }
 
-import { PermissionService } from '../services/permissionService';
-
-const permissionService = new PermissionService();
-const invitationService = new InvitationService(permissionService);
-
-export const invitationController = new InvitationController(invitationService);
+export const invitationController = new InvitationController();

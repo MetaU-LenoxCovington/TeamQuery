@@ -164,6 +164,12 @@ export class SessionService extends EventEmitter {
 		})
 	}
 
+	public stopCleanupInterval() {
+		if (this.sessionCleanupInterval) {
+		  clearInterval(this.sessionCleanupInterval);
+		}
+	  }
+
 	destroy(): void {
 		if (this.sessionCleanupInterval) {
 			clearInterval(this.sessionCleanupInterval);

@@ -1,15 +1,15 @@
 import { Request, Response, NextFunction } from 'express';
 import { GroupService } from '../services/groupService';
 
+const groupService = new GroupService();
+
 export class GroupController {
-  constructor(
-    private groupService: GroupService
-  ) {}
+  constructor() {}
 
   // POST /api/organizations/:orgId/groups
   async createGroup(req: Request, res: Response, next: NextFunction) {
     try {
-      const group = await this.groupService.createGroup(
+      const group = await groupService.createGroup(
         req.user!.userId,
         req.params.orgId,
         req.body
@@ -23,8 +23,10 @@ export class GroupController {
   // GET /api/organizations/:orgId/groups
   async getOrganizationGroups(req: Request, res: Response, next: NextFunction) {
     try {
-      const groups = await this.groupService.getOrganizationGroups(
-        req.user! .userId,
+      console.log("userId: ", req.user!.userId);
+      console.log("orgId: ", req.params.orgId);
+      const groups = await groupService.getOrganizationGroups(
+        req.user!.userId,
         req.params.orgId
       );
       res.json({ success: true, data: groups });
@@ -36,7 +38,7 @@ export class GroupController {
   // PUT /api/organizations/:orgId/groups/:groupId
   async updateGroup(req: Request, res: Response, next: NextFunction) {
     try {
-      const group = await this.groupService.updateGroup(
+      const group = await groupService.updateGroup(
         req.user!.userId,
         req.params.orgId,
         req.params.groupId,
@@ -51,7 +53,7 @@ export class GroupController {
   // DELETE /api/organizations/:orgId/groups/:groupId
   async deleteGroup(req: Request, res: Response, next: NextFunction) {
     try {
-      await this.groupService.deleteGroup(
+      await groupService.deleteGroup(
         req.user!.userId,
         req.params.orgId,
         req.params.groupId
@@ -65,7 +67,7 @@ export class GroupController {
   // GET /api/organizations/:orgId/groups/:groupId/members
   async getGroupMembers(req: Request, res: Response, next: NextFunction) {
     try {
-      const members = await this.groupService.getGroupMembers(
+      const members = await groupService.getGroupMembers(
         req.user!.userId,
         req.params.orgId,
         req.params.groupId
@@ -79,7 +81,7 @@ export class GroupController {
   // POST /api/organizations/:orgId/groups/:groupId/members
   async addMembersToGroup(req: Request, res: Response, next: NextFunction) {
     try {
-      const result = await this.groupService.addMembersToGroup(
+      const result = await groupService.addMembersToGroup(
         req.user!.userId,
         req.params.orgId,
         req.params.groupId,
@@ -94,7 +96,7 @@ export class GroupController {
   // DELETE /api/organizations/:orgId/groups/:groupId/members/:memberId
   async removeMemberFromGroup(req: Request, res: Response, next: NextFunction) {
     try {
-      await this.groupService.removeMemberFromGroup(
+      await groupService.removeMemberFromGroup(
         req.user!.userId,
         req.params.orgId,
         req.params.groupId,
@@ -109,7 +111,7 @@ export class GroupController {
   // PUT /api/organizations/:orgId/groups/:groupId/members/:memberId/permissions
   async updateMemberPermissions(req: Request, res: Response, next: NextFunction) {
     try {
-      const membership = await this.groupService.updateMemberPermissions(
+      const membership = await groupService.updateMemberPermissions(
         req.user!.userId,
         req.params.orgId,
         req.params.groupId,
@@ -126,7 +128,7 @@ export class GroupController {
   async transferMembersBetweenGroups(req: Request, res: Response, next: NextFunction) {
     try {
       const { fromGroupId, toGroupId, memberIds } = req.body;
-      await this.groupService.transferMembersBetweenGroups(
+      await groupService.transferMembersBetweenGroups(
         req.user!.userId,
         req.params.orgId,
         fromGroupId,
@@ -142,7 +144,4 @@ export class GroupController {
 
 import { PermissionService } from '../services/permissionService';
 
-const permissionService = new PermissionService();
-const groupService = new GroupService(permissionService);
-
-export const groupController = new GroupController(groupService);
+export const groupController = new GroupController();

@@ -17,11 +17,10 @@ export interface UpdateOrganizationRequest {
   allowMemberUploads?: boolean;
 }
 
+const permissionService = new PermissionService();
+
 export class OrganizationService {
-  constructor(
-    private permissionService: PermissionService,
-    private sessionService: SessionService
-  ) {}
+  constructor(private sessionService: SessionService) {}
 
   async createOrganization(userId: string, data: CreateOrganizationRequest) {
 
@@ -78,7 +77,7 @@ export class OrganizationService {
     data: UpdateOrganizationRequest
   ) {
 
-    const permissions = await this.permissionService.getUserPermissions(userId, organizationId);
+    const permissions = await permissionService.getUserPermissions(userId, organizationId);
     if (!permissions.isAdmin) {
       throw new PermissionError('Only administrators can update organization settings');
     }
@@ -184,7 +183,7 @@ export class OrganizationService {
 
   async getOrganizationMembers(userId: string, organizationId: string) {
     // Check permissions
-    const permissions = await this.permissionService.getUserPermissions(userId, organizationId);
+    const permissions = await permissionService.getUserPermissions(userId, organizationId);
     if (!permissions.canManageUsers && permissions.role === 'VIEWER') {
       throw new PermissionError('Insufficient permissions to view members');
     }
@@ -236,7 +235,7 @@ export class OrganizationService {
       canManageUsers?: boolean;
     }
   ) {
-    const requesterPermissions = await this.permissionService.getUserPermissions(requesterId, organizationId);
+    const requesterPermissions = await permissionService.getUserPermissions(requesterId, organizationId);
     if (!requesterPermissions.canManageUsers) {
       throw new PermissionError('Cannot manage user roles');
     }
@@ -275,7 +274,7 @@ export class OrganizationService {
 
   async removeMember(requesterId: string, organizationId: string, targetUserId: string) {
 
-    const requesterPermissions = await this.permissionService.getUserPermissions(requesterId, organizationId);
+    const requesterPermissions = await permissionService.getUserPermissions(requesterId, organizationId);
     if (!requesterPermissions.canManageUsers) {
       throw new PermissionError('Cannot remove members');
     }

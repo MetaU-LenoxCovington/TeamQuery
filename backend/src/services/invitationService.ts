@@ -9,10 +9,10 @@ export interface InviteUserRequest {
   groupIds?: string[];
 }
 
+const permissionService = new PermissionService();
+
 export class InvitationService {
-  constructor(
-    private permissionService: PermissionService
-  ) {}
+  constructor() {}
 
   async inviteUser(
     inviterId: string,
@@ -20,7 +20,7 @@ export class InvitationService {
     inviteData: InviteUserRequest
   ) {
 
-    const permissions = await this.permissionService.getUserPermissions(inviterId, organizationId);
+    const permissions = await permissionService.getUserPermissions(inviterId, organizationId);
     if (!permissions.canManageUsers) {
       throw new PermissionError('Cannot invite users');
     }
@@ -125,7 +125,7 @@ export class InvitationService {
   }
 
   async getOrganizationInvitations(userId: string, organizationId: string) {
-    const permissions = await this.permissionService.getUserPermissions(userId, organizationId);
+    const permissions = await permissionService.getUserPermissions(userId, organizationId);
     if (!permissions.canManageUsers) {
       throw new PermissionError('Cannot view organization invitations');
     }
@@ -257,7 +257,7 @@ export class InvitationService {
     if (!invitation) throw new NotFoundError('Invitation not found');
 
     // Check permissions
-    const permissions = await this.permissionService.getUserPermissions(
+    const permissions = await permissionService.getUserPermissions(
       inviterId,
       invitation.organizationId
     );
@@ -301,7 +301,7 @@ export class InvitationService {
 
     if (!invitation) throw new NotFoundError('Invitation not found');
 
-    const permissions = await this.permissionService.getUserPermissions(
+    const permissions = await permissionService.getUserPermissions(
       inviterId,
       invitation.organizationId
     );
