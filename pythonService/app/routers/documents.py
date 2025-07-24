@@ -8,6 +8,7 @@ from datetime import datetime
 import aiofiles
 
 from app.services.document_processing_pipeline import document_processing_pipeline
+from app.services.database_service import database_service
 
 logger = logging.getLogger(__name__)
 
@@ -106,13 +107,15 @@ async def upload_document(
 
         task_id = f"doc-process-{document_id}-{uuid.uuid4()}"
 
-        from app.services.database_service import database_service
-        try:
-            await database_service.save_document(document_id, organization_id, document_metadata)
-            logger.info(f"Successfully created Document record for {document_id}")
-        except Exception as e:
-            logger.error(f"Failed to create Document record for {document_id}: {e}")
-            raise HTTPException(status_code=500, detail=f"Failed to create document record: {str(e)}")
+        document = await database_service.get_document_by_id(document_id)
+        if not document:
+            try:
+                await database_service.save_document(document_id, organization_id, document_metadata)
+                logger.info(f"Successfully created Document record for {document_id}")
+            except Exception as e:
+                logger.error(f"Failed to create Document record for {document_id}: {e}")
+                raise HTTPException(status_code=500, detail=f"Failed to create document record: {str(e)}")
+
 
         background_tasks.add_task(
             process_document_with_pipeline,
@@ -138,104 +141,20 @@ async def upload_document(
             os.remove(temp_path)
         raise HTTPException(status_code=500, detail=str(e))
 
-
-@router.post("/process", response_model=DocumentProcessResponse)
-async def process_document(
-    request: DocumentProcessRequest,
-    background_tasks: BackgroundTasks
-):
-    """
-    Process a document: extract text, chunk, generate embeddings, and store
-    """
-    try:
-        logger.info(f"Starting document processing for {request.document_id}")
-
-        # Add document processing to background tasks
-        background_tasks.add_task(
-            process_document_task,
-            request.document_id,
-            request.organization_id,
-            request.s3_bucket,
-            request.s3_key,
-            request.original_filename,
-            request.mime_type
-        )
-
-        return DocumentProcessResponse(
-            document_id=request.document_id,
-            status="queued",
-            message="Document processing has been queued"
-        )
-
-    except Exception as e:
-        logger.error(f"Failed to queue document processing: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
 @router.get("/status/{document_id}", response_model=ProcessingStatus)
 async def get_processing_status(document_id: str):
-    """
-    Get the processing status of a document
-    """
     try:
-        # TODO: Implement actual status checking
-        # This would check a database or cache for processing status
-
-        return ProcessingStatus(
-            document_id=document_id,
-            status="completed",  # TODO: Get actual status
-            progress=1.0,
-            message="Document processing completed successfully",
-            chunks_created=42  # TODO: Get actual chunk count
-        )
-
+        has_embeddings = await database_service.has_embeddings_for_document(document_id)
+        if has_embeddings:
+            return ProcessingStatus(
+                document_id=document_id,
+                status="completed",
+                progress=1.0,
+                message="Document processing completed"
+            )
     except Exception as e:
         logger.error(f"Failed to get processing status: {e}")
         raise HTTPException(status_code=500, detail=str(e))
-
-
-@router.post("/reprocess/{document_id}")
-async def reprocess_document(
-    document_id: str,
-    background_tasks: BackgroundTasks
-):
-    """
-    Reprocess an existing document
-    """
-    try:
-        logger.info(f"Reprocessing document {document_id}")
-
-        # TODO: Get document info from database
-        # TODO: Add reprocessing task to background tasks
-
-        return {"message": f"Document {document_id} reprocessing queued"}
-
-    except Exception as e:
-        logger.error(f"Failed to reprocess document: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-async def process_document_task(
-    document_id: str,
-    organization_id: str,
-    s3_bucket: str,
-    s3_key: str,
-    original_filename: str,
-    mime_type: str
-):
-    """
-    Background task for document processing from S3
-    """
-    try:
-        logger.info(f"Processing document {document_id} from S3 in background")
-
-        # TODO: Implement S3 download and processing
-        # This would download from S3 and then call the processing pipeline
-
-        logger.warning("S3 processing not yet implemented")
-
-    except Exception as e:
-        logger.error(f"Document processing failed for {document_id}: {e}")
 
 
 async def process_document_with_pipeline(
