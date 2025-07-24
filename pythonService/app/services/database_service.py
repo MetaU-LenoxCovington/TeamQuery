@@ -190,6 +190,189 @@ class DatabaseService:
             logger.error(f"Failed to update last index time: {e}")
             raise
 
+    async def has_embeddings_for_document(self, document_id: str) -> bool:
+        if not self.pool:
+            await self.connect()
+
+        query = """
+            SELECT EXISTS(
+                SELECT 1
+                FROM "Embedding" e
+                INNER JOIN "Chunk" c ON e."chunkId" = c.id
+                INNER JOIN "Document" d ON c."documentId" = d.id
+                WHERE
+                    d.id = $1
+                    AND e."isDeleted" = false
+                    AND c."isDeleted" = false
+                    AND d."isDeleted" = false
+            ) as has_embeddings
+        """
+
+        try:
+            async with self.pool.acquire() as conn:
+                row = await conn.fetchrow(query, document_id)
+                has_embeddings = row["has_embeddings"] if row else False
+
+                logger.info(f"Document {document_id} has embeddings: {has_embeddings}")
+                return has_embeddings
+
+        except Exception as e:
+            logger.error(f"Failed to check embeddings for document {document_id}: {e}")
+            raise
+
+    async def get_chunks_by_document_id(self, document_id: str) -> List[Dict[str, Any]]:
+        """Get all chunks for a specific document by document ID"""
+        if not self.pool:
+            await self.connect()
+
+        query = """
+            SELECT
+                c.id as chunk_id,
+                c.content,
+                c.metadata as chunk_metadata,
+                c."createdAt",
+                c."updatedAt",
+                e.vector,
+                e.id as embedding_id,
+                d.id as document_id,
+                d.title as document_title,
+                d."accessLevel",
+                d."groupId",
+                d."restrictedToUsers",
+                d.metadata as document_metadata
+            FROM "Chunk" c
+            INNER JOIN "Document" d ON c."documentId" = d.id
+            LEFT JOIN "Embedding" e ON e."chunkId" = c.id AND e."isDeleted" = false
+            WHERE
+                c."documentId" = $1
+                AND c."isDeleted" = false
+                AND d."isDeleted" = false
+            ORDER BY c."createdAt"
+        """
+
+        try:
+            async with self.pool.acquire() as conn:
+                rows = await conn.fetch(query, document_id)
+
+                if not rows:
+                    logger.info(f"No chunks found for document {document_id}")
+                    return []
+
+                results = []
+                for row in rows:
+                    # Parse chunk metadata
+                    chunk_metadata = row["chunk_metadata"]
+                    if isinstance(chunk_metadata, str):
+                        try:
+                            chunk_metadata = json.loads(chunk_metadata)
+                        except (json.JSONDecodeError, TypeError):
+                            chunk_metadata = {}
+                    elif chunk_metadata is None:
+                        chunk_metadata = {}
+
+                    # Parse document metadata
+                    document_metadata = row["document_metadata"]
+                    if isinstance(document_metadata, str):
+                        try:
+                            document_metadata = json.loads(document_metadata)
+                        except (json.JSONDecodeError, TypeError):
+                            document_metadata = {}
+                    elif document_metadata is None:
+                        document_metadata = {}
+
+                    # Prepare permission metadata
+                    permission_metadata = {
+                        "accessLevel": row["accessLevel"],
+                        "groupId": row["groupId"],
+                        "restrictedToUsers": row["restrictedToUsers"] or [],
+                    }
+
+                    # Combine all metadata
+                    combined_metadata = {
+                        **chunk_metadata,
+                        **document_metadata,
+                        "document_title": row["document_title"],
+                        **permission_metadata,
+                    }
+
+                    chunk_result = {
+                        "chunk_id": row["chunk_id"],
+                        "content": row["content"],
+                        "document_id": row["document_id"],
+                        "metadata": combined_metadata,
+                        "createdAt": row["createdAt"],
+                        "updatedAt": row["updatedAt"]
+                    }
+
+                    # Convert embedding vector from bytes to numpy array if present
+                    if row["vector"]:
+                        chunk_result["embedding"] = np.frombuffer(
+                            row["vector"], dtype=np.float32
+                        )
+                        chunk_result["embedding_id"] = row["embedding_id"]
+                    else:
+                        chunk_result["embedding"] = None
+                        chunk_result["embedding_id"] = None
+
+                    results.append(chunk_result)
+
+                logger.info(f"Retrieved {len(results)} chunks for document {document_id}")
+                return results
+
+        except Exception as e:
+            logger.error(f"Failed to get chunks for document {document_id}: {e}")
+            raise
+
+    async def get_document_by_id(self, document_id: str) -> Optional[Dict[str, Any]]:
+        if not self.pool:
+            await self.connect()
+
+        query = """
+            SELECT
+                id, "organizationId", title, "accessLevel", "groupId",
+                "restrictedToUsers", metadata, "isDeleted", "createdAt", "updatedAt"
+            FROM "Document"
+            WHERE id = $1 AND "isDeleted" = false
+        """
+
+        try:
+            async with self.pool.acquire() as conn:
+                row = await conn.fetchrow(query, document_id)
+
+                if not row:
+                    logger.info(f"Document {document_id} not found or is deleted")
+                    return None
+
+                # Parse metadata if it's a JSON string
+                metadata = row["metadata"]
+                if isinstance(metadata, str):
+                    try:
+                        metadata = json.loads(metadata)
+                    except (json.JSONDecodeError, TypeError):
+                        metadata = {}
+                elif metadata is None:
+                    metadata = {}
+
+                document = {
+                    "id": row["id"],
+                    "organizationId": row["organizationId"],
+                    "title": row["title"],
+                    "accessLevel": row["accessLevel"],
+                    "groupId": row["groupId"],
+                    "restrictedToUsers": row["restrictedToUsers"] or [],
+                    "metadata": metadata,
+                    "isDeleted": row["isDeleted"],
+                    "createdAt": row["createdAt"],
+                    "updatedAt": row["updatedAt"]
+                }
+
+                logger.info(f"Retrieved document {document_id} from database")
+                return document
+
+        except Exception as e:
+            logger.error(f"Failed to get document {document_id}: {e}")
+            raise
+
     async def save_document(
         self, document_id: str, organization_id: str, document_metadata: Dict[str, Any]
     ) -> str:
