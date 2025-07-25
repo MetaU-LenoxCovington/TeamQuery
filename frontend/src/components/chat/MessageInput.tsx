@@ -9,18 +9,6 @@ interface MessageInputProps {
   isLoading: boolean;
 }
 
-const ContextButton: React.FC<{ onClick: () => void }> = ({ onClick }) => (
-  <button
-    type="button"
-    onClick={onClick}
-    className={chatStyles.messageInput.contextButton.base}
-    style={chatStyles.messageInput.contextButton.getStyle()}
-    title="Add document context"
-  >
-    📎
-  </button>
-);
-
 const SendButton: React.FC<{
   canSend: boolean;
   isLoading: boolean;
@@ -42,18 +30,14 @@ const SendButton: React.FC<{
   </button>
 );
 
-export const MessageInput: React.FC<MessageInputProps & {
-  onOpenContextModal: () => void;
-}> = ({
+export const MessageInput: React.FC<MessageInputProps> = ({
   value,
   onChange,
   onKeyDown,
   textareaRef,
   isLoading,
-  onOpenContextModal
 }) => (
   <div className={chatStyles.messageInput.container}>
-    <ContextButton onClick={onOpenContextModal} />
     <div className={chatStyles.messageInput.textareaWrapper}>
       <textarea
         ref={textareaRef}
