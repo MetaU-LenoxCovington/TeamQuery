@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { authService, AuthResponse, SignupRequest } from '../services/authService';
+import { organizationService } from '../services/organizationService';
 import { User, Organization } from '../types';
 
 interface AuthContextType {
@@ -28,7 +29,7 @@ interface AuthProviderProps {
 
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [currentOrganization, setCurrentOrganizationState] = useState<Organization | null>(null);
+  const [currentOrganization, setCurrentOrganization] = useState<Organization | null>(null);
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -63,20 +64,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setUser(transformedUser);
       setOrganizations(transformedUser.organizations);
 
-      // Set current organization (use first one or from localStorage)
-      const savedOrgId = localStorage.getItem('currentOrganizationId');
-      const targetOrg = savedOrgId
-        ? transformedUser.organizations.find(org => org.id === savedOrgId)
-        : transformedUser.organizations[0];
 
-      if (targetOrg) {
-        setCurrentOrganizationState(targetOrg);
+      if (transformedUser.organizations.length > 0) {
+        setCurrentOrganization(transformedUser.organizations[0]);
       }
-
 
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Authentication failed');
-
       // Clear invalid tokens
       await authService.logout();
     } finally {
@@ -106,12 +100,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setUser(transformedUser);
       setOrganizations(transformedUser.organizations);
 
-      const defaultOrg = transformedUser.organizations.find(org => org.id === response.defaultOrganizationId)
-        || transformedUser.organizations[0];
-
-      if (defaultOrg) {
-        setCurrentOrganizationState(defaultOrg);
-        localStorage.setItem('currentOrganizationId', defaultOrg.id);
+      // Use first organization as default
+      if (transformedUser.organizations.length > 0) {
+        setCurrentOrganization(transformedUser.organizations[0]);
       }
 
     } catch (err) {
@@ -131,19 +122,29 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     } finally {
       // Clear state even if API fails
       setUser(null);
-      setCurrentOrganizationState(null);
+      setCurrentOrganization(null);
       setOrganizations([]);
       setError(null);
-      localStorage.removeItem('currentOrganizationId');
       setIsLoading(false);
     }
   };
 
-  const setCurrentOrganization = (organizationId: string) => {
+  const handleSetCurrentOrganization = async (organizationId: string) => {
     const org = organizations.find(o => o.id === organizationId);
     if (org) {
-      setCurrentOrganizationState(org);
-      localStorage.setItem('currentOrganizationId', organizationId);
+      try {
+        const orgDetails = await organizationService.getOrganizationDetails(organizationId);
+
+        const updatedOrg: Organization = {
+          ...org,
+        };
+
+        setCurrentOrganization(updatedOrg);
+
+      } catch (error) {
+        console.error('Failed to get organization details:', error);
+        setCurrentOrganization(org);
+      }
     }
   };
 
@@ -198,12 +199,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setUser(transformedUser);
       setOrganizations(transformedUser.organizations);
 
-      const defaultOrg = transformedUser.organizations.find(org => org.id === response.defaultOrganizationId)
-        || transformedUser.organizations[0];
-
-      if (defaultOrg) {
-        setCurrentOrganizationState(defaultOrg);
-        localStorage.setItem('currentOrganizationId', defaultOrg.id);
+      // Use first organization as default
+      if (transformedUser.organizations.length > 0) {
+        setCurrentOrganization(transformedUser.organizations[0]);
       }
 
     } catch (err) {
@@ -224,7 +222,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     login,
     signup,
     logout,
-    setCurrentOrganization,
+    setCurrentOrganization: handleSetCurrentOrganization,
     clearError,
     refreshUserData,
   };
