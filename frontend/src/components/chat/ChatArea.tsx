@@ -1,7 +1,6 @@
 import React from 'react';
 import { ChatMessages } from './ChatMessages';
 import { ChatInput } from './ChatInput';
-import { DocumentContextModal } from './DocumentContextModal';
 import { useChat } from '../../hooks/chat';
 
 interface ChatAreaProps {
@@ -11,13 +10,8 @@ interface ChatAreaProps {
 export const ChatArea: React.FC<ChatAreaProps> = () => {
   const {
     messages,
-    selectedContext,
-    isContextModalOpen,
     isLoading,
     handleSendMessage,
-    handleOpenContextModal,
-    handleCloseContextModal,
-    handleSelectContext,
   } = useChat();
 
   return (
@@ -26,19 +20,8 @@ export const ChatArea: React.FC<ChatAreaProps> = () => {
 
       <ChatInput
         onSendMessage={handleSendMessage}
-        onOpenContextModal={handleOpenContextModal}
-        selectedContext={selectedContext}
         isLoading={isLoading}
       />
-
-      {isContextModalOpen && (
-        <DocumentContextModal
-          isOpen={isContextModalOpen}
-          onClose={handleCloseContextModal}
-          onSelectContext={handleSelectContext}
-          selectedContext={selectedContext}
-        />
-      )}
     </div>
   );
 };
