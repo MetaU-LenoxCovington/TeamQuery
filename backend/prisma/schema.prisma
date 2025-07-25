@@ -60,6 +60,7 @@ model Organization {
   auditLogs         AuditLog[]
   searchQueries     SearchQuery[]
   invitations       OrganizationInvite[]
+  accessDenialLogs  AccessDenialLog[]
 
   @@index([adminUserId])
   @@index([createdBy])
@@ -84,6 +85,7 @@ model User {
   searchQueries        SearchQuery[]
   refreshTokens        RefreshToken[]
   sessions             UserSession[]
+  accessDenialLogs     AccessDenialLog[]
 
   @@index([email])
 }
@@ -146,25 +148,6 @@ model OrganizationMembership {
   @@unique([userId, organizationId])
   @@index([organizationId])
   @@index([userId])
-}
-
-model AuditLog {
-  id          String   @id @default(cuid())
-  userId      String
-  organizationId String
-  action      String
-  targetType  String
-  targetId    String?
-  details     Json?
-
-  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-
-  createdAt DateTime @default(now())
-
-  @@index([organizationId])
-  @@index([userId])
-  @@index([createdAt])
 }
 
 model Folder {
@@ -358,4 +341,48 @@ enum InviteStatus {
   ACCEPTED
   DECLINED
   CANCELLED
+}
+
+// Audit logging - for future use
+model AuditLog {
+  id             String   @id @default(cuid())
+  organizationId String
+  userId         String
+  action         String
+  targetType     String   // e.g., "organization", "group", "document"
+  targetId       String
+  changes        Json?
+  timestamp      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([userId])
+  @@index([timestamp])
+}
+
+// Access denial logging for recommendation system
+model AccessDenialLog {
+  id             String   @id @default(cuid())
+  organizationId String
+  userId         String
+  searchQuery    String   // The search query that triggered the denial
+  chunkId        String   // The chunk that was filtered out
+  documentId     String   // The document containing the chunk
+  groupId        String?  // The group that owns the document (if applicable)
+  accessLevel    String   // The access level that prevented access
+  denialReason   String   // Specific reason for denial (e.g., "not_in_group", "insufficient_role")
+  similarity     Float?   // The similarity score before filtering (if available)
+  metadata       Json?    // Additional context (document title, etc.)
+  timestamp      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([userId])
+  @@index([groupId])
+  @@index([timestamp])
+  @@index([userId, groupId]) // For finding denials by user and group
 }
