@@ -3,6 +3,7 @@ import { ChatHeader } from './ChatHeader';
 import { ChatSidebar } from './ChatSidebar';
 import { ChatArea } from './ChatArea';
 import { User, Organization } from '../../types';
+import { useChat } from '../../hooks/chat';
 
 interface ChatLayoutProps {
   user: User;
@@ -18,6 +19,7 @@ export const ChatLayout: React.FC<ChatLayoutProps> = ({
   onOrganizationChange,
 }) => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const { clearChat } = useChat();
 
   const handleSidebarToggle = () => {
     setSidebarOpen(!sidebarOpen);
@@ -30,7 +32,7 @@ export const ChatLayout: React.FC<ChatLayoutProps> = ({
         currentOrganization={currentOrganization}
         user={user}
       />
-      
+
       <div className="flex-1 flex">
         <ChatSidebar
           isOpen={sidebarOpen}
@@ -38,10 +40,11 @@ export const ChatLayout: React.FC<ChatLayoutProps> = ({
           currentOrganization={currentOrganization}
           organizations={organizations}
           onOrganizationChange={onOrganizationChange}
+          onClearChat={clearChat}
         />
-        
+
         <ChatArea />
       </div>
     </div>
   );
-}; 
+};
