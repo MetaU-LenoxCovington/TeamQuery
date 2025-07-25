@@ -34,6 +34,19 @@ export class OrganizationController {
     }
   }
 
+  // GET /api/organizations/:id/details
+  async getOrganizationDetails(req: Request, res: Response, next: NextFunction) {
+    try {
+      const details = await organizationService.getOrganizationDetails(
+        req.user!.userId,
+        req.params.id
+      );
+      res.json({ success: true, data: details });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   // PUT /api/organizations/:id
   async update(req: Request, res: Response, next: NextFunction) {
     try {
