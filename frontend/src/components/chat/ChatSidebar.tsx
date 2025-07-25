@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { COLORS } from '../../styles/colors';
 import { TYPOGRAPHY_STYLES } from '../../styles/typographyStyles';
-import { Organization, Group, Folder, ChatHistory } from '../../types';
+import { Organization, Group, ChatHistory } from '../../types';
 
 interface ChatSidebarProps {
   isOpen: boolean;
@@ -9,6 +9,7 @@ interface ChatSidebarProps {
   currentOrganization?: Organization;
   organizations: Organization[];
   onOrganizationChange: (organizationId: string) => void;
+  onClearChat?: () => void;
 }
 
 const styles = {
@@ -33,76 +34,6 @@ const ROLE_COLORS = {
   VIEWER: { bg: COLORS.oatMilk, text: COLORS.charcoal },
 };
 
-// Mock data - TODO: Move to API service
-const mockGroups: Group[] = [
-  {
-    id: 'group-1',
-    name: '🏢 Property Management',
-    documentCount: 12,
-    folders: [
-      {
-        id: 'folder-1',
-        name: 'Building A Documents',
-        documents: ['Lease Agreement.pdf', 'Maintenance Manual.pdf']
-      },
-      {
-        id: 'folder-2',
-        name: 'Contracts',
-        documents: ['Service Contract.pdf']
-      },
-    ]
-  },
-  {
-    id: 'group-2',
-    name: '🧹 Janitorial Team',
-    documentCount: 8,
-    folders: [
-      {
-        id: 'folder-3',
-        name: 'Safety Protocols',
-        documents: ['Safety Manual.pdf', 'Emergency Procedures.pdf']
-      },
-      {
-        id: 'folder-4',
-        name: 'Equipment',
-        documents: ['Equipment Manual.pdf']
-      },
-    ]
-  },
-  {
-    id: 'group-all',
-    name: '👥 All Organization',
-    documentCount: 25,
-    folders: []
-  }
-];
-
-const mockChatHistory: ChatHistory[] = [
-  {
-    id: 'chat-1',
-    title: 'Building maintenance schedule',
-    timestamp: 'Today',
-    preview: 'When should we...'
-  },
-  {
-    id: 'chat-2',
-    title: 'Safety protocol questions',
-    timestamp: 'Today',
-    preview: 'What are the...'
-  },
-  {
-    id: 'chat-3',
-    title: 'Contract renewal process',
-    timestamp: 'Yesterday',
-    preview: 'How do I...'
-  },
-  {
-    id: 'chat-4',
-    title: 'Equipment replacement',
-    timestamp: 'Last Week',
-    preview: 'Where can I find...'
-  },
-];
 
 const RoleBadge: React.FC<{ role: Organization['role'] }> = ({ role }) => {
   const colors = ROLE_COLORS[role] || ROLE_COLORS.MEMBER;
@@ -131,7 +62,8 @@ const OrganizationSelector: React.FC<{
   isOpen: boolean;
   onToggle: () => void;
   onSelect: (orgId: string) => void;
-}> = ({ currentOrganization, organizations, isOpen, onToggle, onSelect }) => (
+  onCreateOrganization: () => void;
+}> = ({ currentOrganization, organizations, isOpen, onToggle, onSelect, onCreateOrganization }) => (
   <div className="p-4 border-b" style={{ borderColor: COLORS.lavender }}>
     <div className="relative">
       <button
@@ -173,6 +105,19 @@ const OrganizationSelector: React.FC<{
               </div>
             </button>
           ))}
+
+          {/* Create Organization Button */}
+          <div className="border-t" style={{ borderColor: COLORS.lavender }}>
+            <button
+              onClick={onCreateOrganization}
+              className="w-full p-3 text-left hover:bg-gray-50 transition-colors"
+              style={{ color: COLORS.forestGreen }}
+            >
+              <div className={`${TYPOGRAPHY_STYLES.body.base} font-medium`}>
+                + Create New Organization
+              </div>
+            </button>
+          </div>
         </div>
       )}
     </div>
@@ -211,22 +156,12 @@ const GroupItem: React.FC<{ group: Group }> = ({ group }) => (
         ({group.documentCount})
       </span>
     </div>
-    {group.folders.map((folder) => (
-      <FolderItem key={folder.id} folder={folder} />
-    ))}
-  </div>
-);
-
-const FolderItem: React.FC<{ folder: Folder }> = ({ folder }) => (
-  <div className="pl-4 mt-1">
-    <div className={`${TYPOGRAPHY_STYLES.secondary.base} py-1 hover:opacity-75 cursor-pointer`}>
-      📂 {folder.name}
-    </div>
-    {folder.documents.map((doc, index) => (
+    {group.documents.map((doc, index) => (
       <DocumentItem key={index} name={doc} />
     ))}
   </div>
 );
+
 
 const DocumentItem: React.FC<{ name: string }> = ({ name }) => (
   <div className={`pl-4 ${TYPOGRAPHY_STYLES.secondary.small} py-1 hover:opacity-75 cursor-pointer`}>
@@ -278,6 +213,7 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
   currentOrganization,
   organizations,
   onOrganizationChange,
+  onClearChat,
 }) => {
   const [groupsExpanded, setGroupsExpanded] = useState(true);
   const [chatHistoryExpanded, setChatHistoryExpanded] = useState(true);
@@ -286,6 +222,34 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
   const handleOrganizationSelect = (orgId: string) => {
     onOrganizationChange(orgId);
     setOrgSelectorOpen(false);
+  };
+
+  const handleCreateOrganization = async () => {
+    const orgName = prompt('Enter organization name:');
+    if (orgName && orgName.trim()) {
+      try {
+        // TODO: Implement organization creation API call
+        // For now, just show a placeholder message
+        console.log('Creating organization:', orgName.trim());
+        alert(`Organization "${orgName.trim()}" will be created once the API is connected!`);
+
+        // TODO: After successful creation:
+        // Call organizationService.createOrganization()
+        // Refresh user data to get updated organization list
+        // Switch to the new organization
+
+      } catch (error) {
+        console.error('Failed to create organization:', error);
+        alert('Failed to create organization. Please try again.');
+      }
+    }
+    setOrgSelectorOpen(false);
+  };
+
+  const handleClearChat = () => {
+    if (confirm('Are you sure you want to clear the chat history?')) {
+      onClearChat?.();
+    }
   };
 
   if (!isOpen) {
@@ -300,20 +264,26 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
         isOpen={orgSelectorOpen}
         onToggle={() => setOrgSelectorOpen(!orgSelectorOpen)}
         onSelect={handleOrganizationSelect}
+        onCreateOrganization={handleCreateOrganization}
       />
 
       <div className="flex-1 overflow-y-auto">
-        <GroupsSection
-          isExpanded={groupsExpanded}
-          onToggle={() => setGroupsExpanded(!groupsExpanded)}
-          groups={mockGroups}
-        />
+        <div className="p-4">
+          <h3>Groups</h3>
+          <p>Groups will be loaded from API</p>
+        </div>
 
-        <ChatHistorySection
-          isExpanded={chatHistoryExpanded}
-          onToggle={() => setChatHistoryExpanded(!chatHistoryExpanded)}
-          chatHistory={mockChatHistory}
-        />
+        <div className="p-4 border-t" style={{ borderColor: COLORS.lavender }}>
+          <h3>Recent Conversations</h3>
+          <p>Chat history coming soon</p>
+          <button
+            onClick={handleClearChat}
+            className={`mt-2 text-sm ${TYPOGRAPHY_STYLES.secondary.base} hover:opacity-75 cursor-pointer`}
+            style={{ color: COLORS.forestGreen }}
+          >
+            Clear Chat
+          </button>
+        </div>
       </div>
     </div>
   );
