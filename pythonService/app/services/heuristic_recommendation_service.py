@@ -41,7 +41,7 @@ class HeuristicRecommendationService:
             score_components = {
                 "buddy_score": 0.0,
                 "denial_resolution_score": 0.0,
-                "friends_of_friends_score": 0.0,
+                "friend_count_score": 0.0,
                 "frustration_reduction": 0.0
             }
 
@@ -64,16 +64,16 @@ class HeuristicRecommendationService:
                 frustration = self._calculate_frustration_score(denials_for_group)
                 score_components["frustration_reduction"] = frustration
 
-            fof_score = await self._calculate_friends_of_friends_score(
+            friend_count_score = await self._calculate_friend_count_score(
                 user_id, group["id"], buddies, organization_id
             )
-            score_components["friends_of_friends_score"] = fof_score
+            score_components["friend_count_score"] = friend_count_score
 
             final_score = (
                 score_components["buddy_score"] * 0.3 +
                 score_components["denial_resolution_score"] * 0.3 +
                 score_components["frustration_reduction"] * 0.2 +
-                score_components["friends_of_friends_score"] * 0.2
+                score_components["friend_count_score"] * 0.2
             )
 
             if final_score > 0:
@@ -247,8 +247,7 @@ class HeuristicRecommendationService:
         repetition_factor = total_attempts / max(unique_queries, 1)
         return min(1.0, repetition_factor / 10.0)
 
-    # TODO: Change name - just counts how many direct friends are in a group
-    async def _calculate_friends_of_friends_score(
+    async def _calculate_friend_count_score(
         self,
         user_id: str,
         group_id: str,
@@ -324,7 +323,7 @@ class HeuristicRecommendationService:
         if components["frustration_reduction"] > 0.05:
             reasons.append("you've repeatedly tried to access content from this group")
 
-        if components["friends_of_friends_score"] > 0.2:
+        if components["friend_count_score"] > 0.2:
             reasons.append("strongly connected through your network")
 
         return " and ".join(reasons).capitalize() if reasons else "Recommended based on your collaboration patterns"
