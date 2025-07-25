@@ -8,6 +8,7 @@ const createOrganizationRoutes = () => {
   // Organization CRUD
   router.post('/', authenticateToken, organizationController.create);
   router.get('/', authenticateToken, organizationController.getUserOrganizations);
+  router.get('/:id/details', authenticateToken, organizationController.getOrganizationDetails);
   router.put('/:id', authenticateToken, organizationController.update);
   router.delete('/:id', authenticateToken, organizationController.delete);
 
