@@ -16,7 +16,7 @@ export interface Group {
   id: string;
   name: string;
   documentCount: number;
-  folders: Folder[];
+  documents: string[];
 }
 
 export interface Folder {
