@@ -87,9 +87,13 @@ export class SessionService extends EventEmitter {
 			}
 		}
 
-		await prisma.userSession.delete({
-			where: { id: sessionId }
-		})
+		try {
+			await prisma.userSession.delete({
+				where: { id: sessionId }
+			});
+		} catch (error) {
+			console.warn(`Failed to delete session ${sessionId} from database:`, error);
+		}
 	}
 
 	updateSessionActivity(sessionId: string){
