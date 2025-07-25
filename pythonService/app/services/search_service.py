@@ -101,7 +101,6 @@ class SearchService:
             "indexes_used": {
                 "hnsw": org_indexes.hnsw_index is not None,
                 "bm25": False,  # TODO: Update when implemented
-                "inverted": False  # TODO: Update when implemented
             }
         }
 
@@ -145,10 +144,16 @@ class SearchService:
             logger.debug(f"Generated query embedding for '{query}' with {len(query_embedding)} dimensions")
             logger.debug(f"Searching HNSW index with filters: {filters}")
 
+            user_id = None
+            if filters and "permissions" in filters:
+                user_id = filters["permissions"].get("userId")
+
             search_results = hnsw_index.search(
                 query_vector=query_embedding,
                 k=k,
-                filters=filters
+                filters=filters,
+                search_query=query,
+                user_id=user_id
             )
 
             logger.debug(f"HNSW index returned {len(search_results)} raw candidates")

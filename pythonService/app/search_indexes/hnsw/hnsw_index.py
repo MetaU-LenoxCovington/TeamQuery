@@ -4,12 +4,14 @@ import math
 import random
 from collections import defaultdict
 from typing import Any, Dict, List, Optional, Set, Tuple, TYPE_CHECKING
+from datetime import datetime
 
 import numpy as np
 import pickle
 from pathlib import Path
 
 from .hnsw_node import HNSWNode
+from app.services.database_service import database_service
 
 if TYPE_CHECKING:
     from .hnsw_node import HNSWNode as HNSWNodeType
@@ -313,6 +315,8 @@ class HNSWIndex:
         k: int = 10,
         ef: Optional[int] = None,
         filters: Optional[Dict[str, Any]] = None,
+        search_query: Optional[str] = None,
+        user_id: Optional[str] = None,
     ) -> List[Tuple[float, str, HNSWNode]]:
         """
         Args:
@@ -320,6 +324,8 @@ class HNSWIndex:
             k: Number of nearest neighbors to return
             ef: Search parameter (higher = more accurate, slower) but for the scale of an individual organizations search index, very unlikely we will run into any kind of speed performance issues
             filters: Optional metadata filters
+            search_query: The original search query
+            user_id: The user performing the search
 
         Returns:
             List of (distance, node_id, node) tuples
@@ -353,10 +359,25 @@ class HNSWIndex:
                     continue
 
                 if filters and not node.satisfies_filters(filters):
+                    if (search_query and user_id and
+                        self._should_log_group_denial(node, filters)):
+                        group_id = node.metadata.get("groupId")
+                        if group_id:
+                            similarity_score = 1.0 / (1.0 + float(distance))
+
+                            import asyncio
+                            asyncio.create_task(self._log_group_access_denial(
+                                user_id=user_id,
+                                organization_id=self.organization_id,
+                                search_query=search_query,
+                                chunk_id=node.chunk_id,
+                                document_id=node.document_id,
+                                group_id=group_id,
+                                similarity_score=similarity_score
+                            ))
                     continue
 
                 filtered_results.append((distance, node_id, node))
-
 
         return filtered_results[:k]
 
@@ -556,3 +577,49 @@ class HNSWIndex:
 
         logger.info(f"Index loaded successfully. Contains {index.size} nodes.")
         return index
+
+    def _should_log_group_denial(self, node: HNSWNode, filters: Dict[str, Any]) -> bool:
+        """
+        Check if this denial should be logged
+        """
+        if "permissions" not in filters:
+            return False
+
+        permissions = filters["permissions"]
+        user_role = permissions.get("userRole")
+        user_groups = set(permissions.get("userGroupIds", []))
+
+        doc_access_level = node.metadata.get("accessLevel")
+        doc_group_id = node.metadata.get("groupId")
+
+        return bool(doc_access_level == "GROUP" and
+                    doc_group_id and
+                    doc_group_id not in user_groups and
+                    user_role != "ADMIN")
+
+    async def _log_group_access_denial(
+        self,
+        user_id: str,
+        organization_id: str,
+        search_query: str,
+        chunk_id: str,
+        document_id: str,
+        group_id: str,
+        similarity_score: float
+    ) -> None:
+
+        try:
+            await database_service.log_access_denial(
+                organization_id=organization_id,
+                user_id=user_id,
+                search_query=search_query,
+                chunk_id=chunk_id,
+                document_id=document_id,
+                group_id=group_id,
+                access_level="GROUP",
+                denial_reason="not_in_group",
+                similarity_score=similarity_score
+            )
+            logger.debug(f"Logged group access denial for user {user_id}, chunk {chunk_id}, group {group_id}")
+        except Exception as e:
+            logger.error(f"Failed to log access denial: {e}")
