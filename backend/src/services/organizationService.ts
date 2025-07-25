@@ -181,6 +181,51 @@ export class OrganizationService {
     }));
   }
 
+  async getOrganizationDetails(userId: string, organizationId: string) {
+    const membership = await prisma.organizationMembership.findUnique({
+      where: {
+        userId_organizationId: {
+          userId,
+          organizationId,
+        },
+      },
+    });
+
+    if (!membership) {
+      throw new NotFoundError('Organization not found or access denied');
+    }
+
+    const organization = await prisma.organization.findUnique({
+      where: { id: organizationId },
+      include: {
+        _count: {
+          select: {
+            memberships: true,
+            groups: true,
+            documents: true,
+          },
+        },
+      },
+    });
+
+    if (!organization) {
+      throw new NotFoundError('Organization not found');
+    }
+
+    return {
+      ...organization,
+      memberCount: organization._count.memberships,
+      groupCount: organization._count.groups,
+      documentCount: organization._count.documents,
+      userRole: membership.role,
+      userPermissions: {
+        canUpload: membership.canUpload,
+        canDelete: membership.canDelete,
+        canManageUsers: membership.canManageUsers,
+      },
+    };
+  }
+
   async getOrganizationMembers(userId: string, organizationId: string) {
     // Check permissions
     const permissions = await permissionService.getUserPermissions(userId, organizationId);
