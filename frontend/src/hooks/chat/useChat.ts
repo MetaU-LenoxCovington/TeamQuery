@@ -1,29 +1,26 @@
 import { useState, useCallback, useEffect } from 'react';
 import { Message } from '../../types';
 import { chatService } from '../../services/chatService';
+import { useAuthContext } from '../../contexts/AuthContext';
+
 
 export interface UseChatReturn {
   messages: Message[];
-  selectedContext: string[];
-  isContextModalOpen: boolean;
   isLoading: boolean;
   error: string | null;
-  handleSendMessage: (content: string, contextIds?: string[]) => Promise<void>;
-  handleOpenContextModal: () => void;
-  handleCloseContextModal: () => void;
-  handleSelectContext: (contextIds: string[]) => void;
+  handleSendMessage: (content: string) => Promise<void>;
   setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
   clearError: () => void;
+  clearChat: () => void;
 }
 
 export const useChat = (): UseChatReturn => {
   const [messages, setMessages] = useState<Message[]>([]);
-  const [selectedContext, setSelectedContext] = useState<string[]>([]);
-  const [isContextModalOpen, setIsContextModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { currentOrganization } = useAuthContext();
 
-  // Load initial messages
+  // Load initial messages - TODO: Implement chat history persistence on backend
   useEffect(() => {
     const loadMessages = async () => {
       try {
@@ -38,7 +35,13 @@ export const useChat = (): UseChatReturn => {
     loadMessages();
   }, []);
 
-  const handleSendMessage = useCallback(async (content: string, contextIds?: string[]) => {
+  const handleSendMessage = useCallback(async (content: string) => {
+    // Check if organization is available
+    if (!currentOrganization) {
+      setError('No organization selected. Please select an organization to continue.');
+      return;
+    }
+
     const userMessage: Message = {
       id: `msg-${Date.now()}`,
       type: 'user',
@@ -53,9 +56,7 @@ export const useChat = (): UseChatReturn => {
     try {
       const aiMessage = await chatService.sendMessage({
         content,
-        contextIds,
-        // TODO: Add organizationId when available
-        // organizationId: currentOrganization.id
+        organizationId: currentOrganization.id
       });
 
       setMessages(prev => [...prev, aiMessage]);
@@ -69,36 +70,24 @@ export const useChat = (): UseChatReturn => {
     } finally {
       setIsLoading(false);
     }
-  }, []);
-
-  const handleOpenContextModal = useCallback(() => {
-    setIsContextModalOpen(true);
-  }, []);
-
-  const handleCloseContextModal = useCallback(() => {
-    setIsContextModalOpen(false);
-  }, []);
-
-  const handleSelectContext = useCallback((contextIds: string[]) => {
-    setSelectedContext(contextIds);
-    setIsContextModalOpen(false);
-  }, []);
+  }, [currentOrganization]);
 
   const clearError = useCallback(() => {
     setError(null);
   }, []);
 
+  const clearChat = useCallback(() => {
+    setMessages([]);
+    setError(null);
+  }, []);
+
   return {
     messages,
-    selectedContext,
-    isContextModalOpen,
     isLoading,
     error,
     handleSendMessage,
-    handleOpenContextModal,
-    handleCloseContextModal,
-    handleSelectContext,
     setMessages,
     clearError,
+    clearChat,
   };
 };
