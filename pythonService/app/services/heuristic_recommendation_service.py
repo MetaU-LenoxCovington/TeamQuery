@@ -247,6 +247,7 @@ class HeuristicRecommendationService:
         repetition_factor = total_attempts / max(unique_queries, 1)
         return min(1.0, repetition_factor / 10.0)
 
+    # TODO: Change name - just counts how many direct friends are in a group
     async def _calculate_friends_of_friends_score(
         self,
         user_id: str,
