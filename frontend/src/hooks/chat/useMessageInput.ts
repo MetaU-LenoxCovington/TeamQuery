@@ -10,14 +10,12 @@ export interface UseMessageInputReturn {
 }
 
 export interface UseMessageInputOptions {
-  onSendMessage: (message: string, selectedContext?: string[]) => void;
-  selectedContext: string[];
+  onSendMessage: (message: string) => void;
   isLoading: boolean;
 }
 
 export const useMessageInput = ({
   onSendMessage,
-  selectedContext,
   isLoading,
 }: UseMessageInputOptions): UseMessageInputReturn => {
   const [message, setMessage] = useState('');
@@ -26,17 +24,14 @@ export const useMessageInput = ({
   const handleSubmit = useCallback((e: React.FormEvent) => {
     e.preventDefault();
     if (message.trim() && !isLoading) {
-      onSendMessage(
-        message.trim(),
-        selectedContext.length > 0 ? selectedContext : undefined
-      );
+      onSendMessage(message.trim());
       setMessage('');
       // Reset textarea height
       if (textareaRef.current) {
         textareaRef.current.style.height = 'auto';
       }
     }
-  }, [message, isLoading, onSendMessage, selectedContext]);
+  }, [message, isLoading, onSendMessage]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
