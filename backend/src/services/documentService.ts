@@ -365,7 +365,7 @@ export class DocumentService {
 
     return {
       documentId,
-      status: isProcessed ? 'completed' : 'processing',
+      status: isProcessed ? 'ready' : 'processing',
       chunkCount,
       embeddingCount,
       isProcessed
