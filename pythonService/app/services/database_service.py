@@ -513,6 +513,62 @@ class DatabaseService:
         except Exception as e:
             logger.error(f"Failed to mark embeddings as deleted: {e}")
             raise
+
+    async def log_access_denial(
+        self,
+        organization_id: str,
+        user_id: str,
+        search_query: str,
+        chunk_id: str,
+        document_id: str,
+        group_id: Optional[str],
+        access_level: str,
+        denial_reason: str,
+        similarity_score: Optional[float] = None,
+        metadata: Optional[Dict[str, Any]] = None
+    ):
+        if not self.pool:
+            await self.connect()
+
+        query = """
+            INSERT INTO "AccessDenialLog" (
+                "organizationId",
+                "userId",
+                "searchQuery",
+                "chunkId",
+                "documentId",
+                "groupId",
+                "accessLevel",
+                "denialReason",
+                "similarity",
+                "metadata",
+                "timestamp"
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW())
+        """
+
+        try:
+            async with self.pool.acquire() as conn:
+                await conn.execute(
+                    query,
+                    organization_id,
+                    user_id,
+                    search_query,
+                    chunk_id,
+                    document_id,
+                    group_id,
+                    access_level,
+                    denial_reason,
+                    similarity_score,
+                    json.dumps(metadata) if metadata else None
+                )
+                logger.debug(
+                    f"Logged access denial for user {user_id} to chunk {chunk_id} "
+                    f"(reason: {denial_reason})"
+                )
+        except Exception as e:
+            logger.error(f"Failed to log access denial: {e}")
+
     async def cleanup(self) -> None:
         """
         Cleanup method to close database connection pool.
