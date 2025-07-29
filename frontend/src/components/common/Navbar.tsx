@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useAuthContext } from '../../contexts/AuthContext';
 
 interface NavbarProps {
-  currentPage?: 'chat' | 'dashboard' | 'documents' | 'members';
+  currentPage?: 'chat' | 'dashboard' | 'documents' | 'members' | 'groups' | 'invitations';
 }
 
 export const Navbar: React.FC<NavbarProps> = ({ currentPage }) => {
@@ -36,6 +36,12 @@ export const Navbar: React.FC<NavbarProps> = ({ currentPage }) => {
           </Link>
           <Link href="/dashboard/members" className={currentPage === 'members' ? 'font-bold' : 'text-blue-600'}>
             Members
+          </Link>
+          <Link href="/dashboard/groups" className={currentPage === 'groups' ? 'font-bold' : 'text-blue-600'}>
+            Groups
+          </Link>
+          <Link href="/dashboard/invitations" className={currentPage === 'invitations' ? 'font-bold' : 'text-blue-600'}>
+            Invitations
           </Link>
         </div>
         <div className="flex items-center space-x-4">
