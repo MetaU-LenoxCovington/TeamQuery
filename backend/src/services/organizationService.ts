@@ -24,17 +24,6 @@ export class OrganizationService {
 
   async createOrganization(userId: string, data: CreateOrganizationRequest) {
 
-    /*
-    // TODO: Set some limit on the number of organizations a user can create
-    const userOrgCount = await prisma.organizationMembership.count({
-      where: { userId, organization: { isActive: true } }
-    });
-
-    if (userOrgCount >= 10) {
-      throw new ValidationError('Maximum organization limit reached (10)');
-    }
-    */
-
     return await prisma.$transaction(async (tx: any) => {
       const organization = await tx.organization.create({
         data: {
