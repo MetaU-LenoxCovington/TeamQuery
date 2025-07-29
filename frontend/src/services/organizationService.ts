@@ -21,12 +21,25 @@ export interface OrganizationMember {
   lastActive?: string;
 }
 
+export interface OrganizationCreateRequest {
+  name: string;
+  description?: string;
+}
+
 export interface OrganizationUpdateRequest {
   name?: string;
   description?: string;
 }
 
 class OrganizationService {
+  async createOrganization(data: OrganizationCreateRequest): Promise<Organization> {
+    const response = await apiClient.post<{ success: boolean; data: Organization }>(
+      '/api/organizations',
+      data
+    );
+    return response.data;
+  }
+
   async getOrganizationDetails(organizationId: string): Promise<OrganizationDetails> {
     const response = await apiClient.get<{ success: boolean; data: OrganizationDetails }>(
       `/api/organizations/${organizationId}/details`

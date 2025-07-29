@@ -3,6 +3,8 @@ import { COLORS } from '../../styles/colors';
 import { TYPOGRAPHY_STYLES } from '../../styles/typographyStyles';
 import { Organization, Group, ChatHistory } from '../../types';
 import { groupService, GroupWithDocuments } from '../../services/groupService';
+import { organizationService } from '../../services/organizationService';
+import { useAuthContext } from '../../contexts/AuthContext';
 
 interface ChatSidebarProps {
   isOpen: boolean;
@@ -216,6 +218,7 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
   onOrganizationChange,
   onClearChat,
 }) => {
+  const { refreshUserData, setCurrentOrganization } = useAuthContext();
   const [groupsExpanded, setGroupsExpanded] = useState(true);
   const [chatHistoryExpanded, setChatHistoryExpanded] = useState(true);
   const [orgSelectorOpen, setOrgSelectorOpen] = useState(false);
@@ -256,15 +259,15 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
     const orgName = prompt('Enter organization name:');
     if (orgName && orgName.trim()) {
       try {
-        // TODO: Implement organization creation API call
-        // For now, just show a placeholder message
-        console.log('Creating organization:', orgName.trim());
-        alert(`Organization "${orgName.trim()}" will be created once the API is connected!`);
+        const newOrg = await organizationService.createOrganization({
+          name: orgName.trim()
+        });
 
-        // TODO: After successful creation:
-        // Call organizationService.createOrganization()
         // Refresh user data to get updated organization list
-        // Switch to the new organization
+        await refreshUserData();
+
+        // Auto switch to new organization
+        setCurrentOrganization(newOrg.id);
 
       } catch (error) {
         console.error('Failed to create organization:', error);
