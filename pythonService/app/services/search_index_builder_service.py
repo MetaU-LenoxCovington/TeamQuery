@@ -1,21 +1,17 @@
 import asyncio
 import logging
+import os
 from dataclasses import dataclass
 from datetime import datetime
+from pathlib import Path
 from typing import Any, Dict, List, Optional, Set
+
+import aiofiles
 
 import numpy as np
 from app.search_indexes.hnsw import HNSWBuilder, HNSWIndex
 
 from app.services.database_service import database_service
-
-# TODO: Uncomment when BM25 and Inverted index are implemented
-# from app.search_indexes.bm25 import BM25Index
-# from app.search_indexes.inverted import InvertedIndex
-
-import aiofiles
-import os
-from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
@@ -24,8 +20,6 @@ logger = logging.getLogger(__name__)
 class OrganizationIndexes:
     organization_id: str
     hnsw_index: Optional[HNSWIndex] = None
-    # bm25_index: Optional[BM25Index] = None
-    # inverted_index: Optional[InvertedIndex] = None
     last_updated: Optional[datetime] = None
     is_building: bool = False
     chunk_count: int = 0
@@ -228,8 +222,6 @@ class SearchIndexBuilderService:
                 f"for organization {organization_id}"
             )
 
-        # TODO: Add to BM25
-
         org_indexes.chunk_count += len(new_chunks)
 
         return True
@@ -261,8 +253,6 @@ class SearchIndexBuilderService:
                 f"for organization {organization_id}"
             )
 
-        # TODO: Remove from BM25 and Inverted indexes
-
         return True
 
     async def update_chunk_metadata(
@@ -289,16 +279,12 @@ class SearchIndexBuilderService:
             for update in chunk_updates:
                 chunk_id = update["chunk_id"]
                 new_metadata = update["metadata"]
-                if org_indexes.hnsw_index.update_node_metadata(
-                    chunk_id, new_metadata
-                ):
+                if org_indexes.hnsw_index.update_node_metadata(chunk_id, new_metadata):
                     updated_count += 1
             logger.info(
                 f"Updated metadata for {updated_count} chunks in HNSW index "
                 f"for organization {organization_id}"
             )
-
-        # TODO: Update BM25 and Inverted indexes
 
         return True
 
@@ -306,7 +292,9 @@ class SearchIndexBuilderService:
         """
         TODO: Implement full document reprocessing.
         """
-        logger.warning(f"TODO: Full re-process triggered for {organization_id}. Not yet implemented.")
+        logger.warning(
+            f"TODO: Full re-process triggered for {organization_id}. Not yet implemented."
+        )
         pass
 
     def get_indexes(self, organization_id: str) -> Optional[OrganizationIndexes]:
@@ -329,7 +317,9 @@ class SearchIndexBuilderService:
         except Exception as e:
             logger.warning(f"Error during SearchIndexBuilderService cleanup: {e}")
 
-    def destroy_indexes(self, organization_id: str, persist_to_disk: bool = False) -> bool:
+    def destroy_indexes(
+        self, organization_id: str, persist_to_disk: bool = False
+    ) -> bool:
         """
         Remove all indexes for an organization from memory.
         Optionally persists the index to disk before destroying.
@@ -364,7 +354,9 @@ class SearchIndexBuilderService:
 
         file_path = self._get_index_file_path(organization_id)
         if not file_path.exists():
-            logger.info(f"No persisted index found for {organization_id} at {file_path}")
+            logger.info(
+                f"No persisted index found for {organization_id} at {file_path}"
+            )
             return False
 
         try:
@@ -378,7 +370,7 @@ class SearchIndexBuilderService:
                 hnsw_index=hnsw_index,
                 last_updated=datetime.fromtimestamp(file_path.stat().st_mtime),
                 chunk_count=hnsw_index.size,
-                document_count=0
+                document_count=0,
             )
             self.indexes[organization_id] = org_indexes
             logger.info(f"Successfully loaded index for {organization_id} into memory.")
