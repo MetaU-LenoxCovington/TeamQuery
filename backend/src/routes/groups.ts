@@ -9,6 +9,7 @@ const createGroupRoutes = () => {
   // Group CRUD
   router.post('/', authenticateToken, groupController.createGroup);
   router.get('/', authenticateToken, groupController.getOrganizationGroups);
+  router.get('/user-groups', authenticateToken, groupController.getUserGroups);
   router.put('/:groupId', authenticateToken, groupController.updateGroup);
   router.delete('/:groupId', authenticateToken, groupController.deleteGroup);
 

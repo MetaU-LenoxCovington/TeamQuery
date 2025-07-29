@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { COLORS } from '../../styles/colors';
 import { TYPOGRAPHY_STYLES } from '../../styles/typographyStyles';
 import { Organization, Group, ChatHistory } from '../../types';
+import { groupService, GroupWithDocuments } from '../../services/groupService';
 
 interface ChatSidebarProps {
   isOpen: boolean;
@@ -218,6 +219,33 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
   const [groupsExpanded, setGroupsExpanded] = useState(true);
   const [chatHistoryExpanded, setChatHistoryExpanded] = useState(true);
   const [orgSelectorOpen, setOrgSelectorOpen] = useState(false);
+  const [userGroups, setUserGroups] = useState<GroupWithDocuments[]>([]);
+  const [groupsLoading, setGroupsLoading] = useState(false);
+  const [groupsError, setGroupsError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchUserGroups = async () => {
+      if (!currentOrganization) {
+        setUserGroups([]);
+        return;
+      }
+
+      try {
+        setGroupsLoading(true);
+        setGroupsError(null);
+        const groups = await groupService.getUserGroups(currentOrganization.id);
+        setUserGroups(groups);
+      } catch (error) {
+        console.error('Failed to fetch user groups:', error);
+        setGroupsError(error instanceof Error ? error.message : 'Failed to load groups');
+        setUserGroups([]);
+      } finally {
+        setGroupsLoading(false);
+      }
+    };
+
+    fetchUserGroups();
+  }, [currentOrganization]);
 
   const handleOrganizationSelect = (orgId: string) => {
     onOrganizationChange(orgId);
@@ -269,8 +297,51 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
 
       <div className="flex-1 overflow-y-auto">
         <div className="p-4">
-          <h3>Groups</h3>
-          <p>Groups will be loaded from API</p>
+          <button
+            onClick={() => setGroupsExpanded(!groupsExpanded)}
+            className={`w-full flex items-center justify-between ${TYPOGRAPHY_STYLES.body.base} font-medium hover:opacity-75 transition-opacity`}
+          >
+            <span>📁 Groups</span>
+            <span>{groupsExpanded ? '▼' : '▶'}</span>
+          </button>
+
+          {groupsExpanded && (
+            <div className="mt-3 space-y-2">
+              {groupsLoading && (
+                <div className={`${TYPOGRAPHY_STYLES.secondary.small} text-center py-2`}>
+                  Loading groups...
+                </div>
+              )}
+
+              {groupsError && (
+                <div className={`${TYPOGRAPHY_STYLES.secondary.small} text-red-600 py-2`}>
+                  Error: {groupsError}
+                </div>
+              )}
+
+              {!groupsLoading && !groupsError && userGroups.length === 0 && (
+                <div className={`${TYPOGRAPHY_STYLES.secondary.small} text-gray-500 py-2`}>
+                  No groups found
+                </div>
+              )}
+
+              {!groupsLoading && !groupsError && userGroups.map((group) => (
+                <div key={group.id} className="pl-4">
+                  <div className={`flex items-center gap-2 ${TYPOGRAPHY_STYLES.body.base} py-1`}>
+                    <span>{group.name}</span>
+                    <span className={`${TYPOGRAPHY_STYLES.secondary.small} opacity-75`}>
+                      ({group.documents.length})
+                    </span>
+                  </div>
+                  {group.documents.map((doc) => (
+                    <div key={doc.id} className={`pl-4 ${TYPOGRAPHY_STYLES.secondary.small} py-1 hover:opacity-75 cursor-pointer`}>
+                      📄 {doc.title}
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="p-4 border-t" style={{ borderColor: COLORS.lavender }}>

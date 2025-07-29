@@ -32,9 +32,25 @@ export interface GroupMembershipRequest {
   userIds: string[];
 }
 
+export interface GroupDocument {
+  id: string;
+  title: string;
+  originalFileName: string;
+  createdAt: string;
+}
+
+export interface GroupWithDocuments extends Group {
+  documents: GroupDocument[];
+}
+
 export interface GroupListResponse {
   success: boolean;
   data: Group[];
+}
+
+export interface GroupWithDocumentsResponse {
+  success: boolean;
+  data: GroupWithDocuments[];
 }
 
 export interface GroupResponse {
@@ -51,6 +67,13 @@ class GroupService {
   async getGroups(organizationId: string): Promise<Group[]> {
     const response = await apiClient.get<GroupListResponse>(
       `/api/organizations/${organizationId}/groups`
+    );
+    return response.data;
+  }
+
+  async getUserGroups(organizationId: string): Promise<GroupWithDocuments[]> {
+    const response = await apiClient.get<GroupWithDocumentsResponse>(
+      `/api/organizations/${organizationId}/groups/user-groups`
     );
     return response.data;
   }

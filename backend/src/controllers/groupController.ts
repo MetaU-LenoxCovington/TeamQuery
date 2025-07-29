@@ -35,6 +35,19 @@ export class GroupController {
     }
   }
 
+  // GET /api/organizations/:orgId/groups/user-groups
+  async getUserGroups(req: Request, res: Response, next: NextFunction) {
+    try {
+      const groups = await groupService.getUserGroups(
+        req.user!.userId,
+        req.params.orgId
+      );
+      res.json({ success: true, data: groups });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   // PUT /api/organizations/:orgId/groups/:groupId
   async updateGroup(req: Request, res: Response, next: NextFunction) {
     try {

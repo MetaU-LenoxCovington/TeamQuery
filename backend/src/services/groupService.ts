@@ -50,7 +50,7 @@ export class GroupService {
       throw new ValidationError('A group with this name already exists in the organization');
     }
 
-    return await prisma.group.create({
+    const group = await prisma.group.create({
       data: {
         name: data.name,
         description: data.description,
@@ -66,6 +66,17 @@ export class GroupService {
         }
       }
     });
+
+    await prisma.groupMembership.create({
+      data: {
+        userId,
+        groupId: group.id,
+        canUpload: true,
+        canDelete: true,
+      }
+    });
+
+    return group;
   }
 
   async updateGroup(userId: string, organizationId: string, groupId: string, data: UpdateGroupRequest) {
@@ -194,6 +205,59 @@ export class GroupService {
       memberCount: group._count.members,
       documentCount: group._count.documents,
       userMembership: group.members[0] || null,
+      createdAt: group.createdAt,
+      updatedAt: group.updatedAt,
+    }));
+  }
+
+  async getUserGroups(userId: string, organizationId: string) {
+    const permissions = await permissionService.getUserPermissions(userId, organizationId);
+    if (!(permissions.role === 'MEMBER' || permissions.role === 'MANAGER' || permissions.role === 'ADMIN')) {
+      throw new PermissionError('Organization membership required');
+    }
+
+    const groups = await prisma.group.findMany({
+      where: {
+        organizationId,
+        members: {
+          some: {
+            userId
+          }
+        }
+      },
+      include: {
+        _count: {
+          select: {
+            members: true,
+            documents: true
+          }
+        },
+        documents: {
+          select: {
+            id: true,
+            title: true,
+            originalFileName: true,
+            createdAt: true
+          },
+          orderBy: {
+            createdAt: 'desc'
+          }
+        }
+      },
+      orderBy: [
+        { isDefault: 'desc' },
+        { name: 'asc' }
+      ]
+    });
+
+    return groups.map((group: any) => ({
+      id: group.id,
+      name: group.name,
+      description: group.description,
+      isDefault: group.isDefault,
+      memberCount: group._count.members,
+      documentCount: group._count.documents,
+      documents: group.documents,
       createdAt: group.createdAt,
       updatedAt: group.updatedAt,
     }));
