@@ -6,6 +6,7 @@ from fastapi import BackgroundTasks
 
 from app.services.search_index_builder_service import search_index_builder
 from app.services.search_service import search_service
+from app.services.heuristic_recommendation_service import heuristic_recommendation_service
 
 logger = logging.getLogger(__name__)
 
@@ -71,6 +72,27 @@ class IndexStatus(BaseModel):
     chunk_count: int
     last_updated: Optional[str] = None
     build_time: Optional[float] = None
+
+
+class UserGroupRecommendationRequest(BaseModel):
+    user_id: str
+    organization_id: str
+    top_k: int = 3
+
+
+class GroupRecommendation(BaseModel):
+    group_id: str
+    group_name: str
+    score: float
+    reason: str
+    details: Dict[str, Any]
+
+
+class UserGroupRecommendationResponse(BaseModel):
+    user_id: str
+    organization_id: str
+    recommendations: List[GroupRecommendation]
+    processing_time: float
 
 
 @router.post("/build-index", response_model=Dict[str, Any])
@@ -348,4 +370,53 @@ async def destroy_index(organization_id: str, persist: bool = False):
 
     except Exception as e:
         logger.error(f"Failed to destroy index: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/users/{user_id}/group-recommendations", response_model=UserGroupRecommendationResponse)
+async def get_user_group_recommendations(user_id: str, request: UserGroupRecommendationRequest):
+    """
+    Get group recommendations for a specific user based on their collaboration patterns,
+    access denials, and buddy networks.
+    """
+    import time
+
+    start_time = time.time()
+
+    try:
+        logger.info(f"Getting group recommendations for user {user_id} in organization {request.organization_id}")
+
+        if user_id != request.user_id:
+            raise HTTPException(status_code=400, detail="User ID in path must match user ID in request body")
+
+        recommendations = await heuristic_recommendation_service.get_group_recommendations_for_user(
+            user_id=request.user_id,
+            organization_id=request.organization_id,
+            top_k=request.top_k
+        )
+
+        formatted_recommendations = []
+        for rec in recommendations:
+            formatted_recommendations.append(GroupRecommendation(
+                group_id=rec["group_id"],
+                group_name=rec["group_name"],
+                score=rec["score"],
+                reason=rec["reason"],
+                details=rec["details"]
+            ))
+
+        processing_time = time.time() - start_time
+
+        logger.info(f"Generated {len(formatted_recommendations)} group recommendations for user {user_id} in {processing_time:.2f}s")
+
+        return UserGroupRecommendationResponse(
+            user_id=request.user_id,
+            organization_id=request.organization_id,
+            recommendations=formatted_recommendations,
+            processing_time=processing_time
+        )
+
+    except Exception as e:
+        processing_time = time.time() - start_time
+        logger.error(f"Failed to get group recommendations for user {user_id} after {processing_time:.2f}s: {e}")
         raise HTTPException(status_code=500, detail=str(e))

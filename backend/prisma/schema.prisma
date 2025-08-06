@@ -61,6 +61,7 @@ model Organization {
   searchQueries     SearchQuery[]
   invitations       OrganizationInvite[]
   accessDenialLogs  AccessDenialLog[]
+  conversations     Conversation[]
 
   @@index([adminUserId])
   @@index([createdBy])
@@ -86,6 +87,7 @@ model User {
   refreshTokens        RefreshToken[]
   sessions             UserSession[]
   accessDenialLogs     AccessDenialLog[]
+  conversations        Conversation[]
 
   @@index([email])
 }
@@ -343,6 +345,11 @@ enum InviteStatus {
   CANCELLED
 }
 
+enum MessageRole {
+  USER
+  ASSISTANT
+}
+
 // Audit logging - for future use
 model AuditLog {
   id             String   @id @default(cuid())
@@ -385,4 +392,33 @@ model AccessDenialLog {
   @@index([groupId])
   @@index([timestamp])
   @@index([userId, groupId]) // For finding denials by user and group
+}
+
+model Conversation {
+  id             String @id @default(cuid())
+  title          String
+  userId         String
+  organizationId String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  messages     Message[]
+
+  @@index([userId, organizationId, updatedAt])
+  @@index([organizationId])
+}
+
+model Message {
+  id             String @id @default(cuid())
+  conversationId String
+  content        String
+  role           MessageRole
+  sources        Json? // RAG sources for assistant messages
+  createdAt      DateTime @default(now())
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId, createdAt])
 }

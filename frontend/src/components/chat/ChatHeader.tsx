@@ -21,7 +21,6 @@ const NavigationLinks: React.FC = () => {
   const pathname = usePathname();
 
   const navItems = [
-    { href: '/dashboard', label: 'Dashboard', icon: '🏠' },
     { href: '/chat', label: 'Chat', icon: '💬' },
     { href: '/dashboard/documents', label: 'Documents', icon: '📄' },
     { href: '/dashboard/groups', label: 'Groups', icon: '👥' },

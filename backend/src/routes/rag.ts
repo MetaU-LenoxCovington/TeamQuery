@@ -14,6 +14,8 @@ const createRagRoutes = () => {
   router.post('/build-index', ragController.buildIndex);
   router.get('/index-status', ragController.getIndexStatus);
   router.delete('/index', ragController.destroyIndex);
+  
+  router.get('/users/:userId/group-recommendations', ragController.getUserGroupRecommendations);
 
   return router;
 };

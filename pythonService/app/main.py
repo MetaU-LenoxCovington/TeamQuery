@@ -49,7 +49,8 @@ app.add_middleware(
 
 app.include_router(documents.router, prefix="/api/documents", tags=["documents"])
 app.include_router(search.router, prefix="/api/search", tags=["search"])
-
+# app.include_router(embedding_recommendations.router, prefix="/api/recommendations", tags=["recommendations"])
+# app.include_router(heuristic_recommendations.router, tags=["heuristic-recommendations"])
 
 @app.get("/")
 async def root():

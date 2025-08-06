@@ -163,6 +163,38 @@ export class RagController {
       next(error);
     }
   }
+
+  // GET /api/rag/users/:userId/group-recommendations
+  async getUserGroupRecommendations(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { userId } = req.params;
+      const { organizationId, topK } = req.query;
+
+      if (!userId || typeof userId !== 'string') {
+        throw new ValidationError('User ID is required and must be a string');
+      }
+
+      if (!organizationId || typeof organizationId !== 'string') {
+        throw new ValidationError('Organization ID is required and must be a string');
+      }
+
+      const topKNumber = topK ? parseInt(topK as string, 10) : 3;
+      if (isNaN(topKNumber) || topKNumber < 1 || topKNumber > 10) {
+        throw new ValidationError('topK must be a number between 1 and 10');
+      }
+
+      const results = await ragService.getUserGroupRecommendations(
+        req.user!.userId,
+        userId,
+        organizationId,
+        topKNumber
+      );
+
+      res.json({ success: true, data: results });
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 export const ragController = new RagController();

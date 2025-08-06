@@ -41,28 +41,6 @@ export const ProfileDropdown: React.FC<ProfileDropdownProps> = ({ user, isOpen, 
             {user?.email || 'user@example.com'}
           </div>
         </div>
-
-        <div className={chatStyles.chatHeader.profileDropdown.dropdown.menu}>
-          <button className={chatStyles.chatHeader.profileDropdown.dropdown.menuItem}>
-            <span className={chatStyles.chatHeader.profileDropdown.dropdown.menuItemText}>
-              Account Settings
-            </span>
-          </button>
-          <button className={chatStyles.chatHeader.profileDropdown.dropdown.menuItem}>
-            <span className={chatStyles.chatHeader.profileDropdown.dropdown.menuItemText}>
-              Organization Dashboard
-            </span>
-          </button>
-          <hr
-            className="my-1"
-            style={chatStyles.chatHeader.profileDropdown.dropdown.divider.style}
-          />
-          <button className={chatStyles.chatHeader.profileDropdown.dropdown.logoutItem}>
-            <span className={chatStyles.chatHeader.profileDropdown.dropdown.menuItemText}>
-              Logout
-            </span>
-          </button>
-        </div>
       </div>
     )}
   </div>

@@ -35,7 +35,7 @@ export class GroupService {
   async createGroup(userId: string, organizationId: string, data: CreateGroupRequest) {
     // Check permissions - only admins and managers can create groups
     const permissions = await permissionService.getUserPermissions(userId, organizationId);
-    if (!permissions.canManageUsers) {
+    if (!permissions.canManageUsers && !permissions.isAdmin) {
       throw new PermissionError('Insufficient permissions to create groups');
     }
 
@@ -82,7 +82,7 @@ export class GroupService {
   async updateGroup(userId: string, organizationId: string, groupId: string, data: UpdateGroupRequest) {
 
     const permissions = await permissionService.getUserPermissions(userId, organizationId);
-    if (!permissions.canManageUsers) {
+    if (!permissions.canManageUsers && !permissions.isAdmin) {
       throw new PermissionError('Insufficient permissions to update groups');
     }
 
@@ -129,7 +129,7 @@ export class GroupService {
   async deleteGroup(userId: string, organizationId: string, groupId: string) {
 
     const permissions = await permissionService.getUserPermissions(userId, organizationId);
-    if (!permissions.canManageUsers) {
+    if (!permissions.canManageUsers && !permissions.isAdmin) {
       throw new PermissionError('Insufficient permissions to delete groups');
     }
 
@@ -311,7 +311,8 @@ export class GroupService {
     data: AddMembersRequest
   ) {
     const permissions = await permissionService.getUserPermissions(userId, organizationId);
-    if (!permissions.canManageUsers) {
+    if (!permissions.canManageUsers && !permissions.isAdmin && !(permissions.role == 'MANAGER')) {
+      console.log('permissions', permissions)
       throw new PermissionError('Insufficient permissions to manage group members');
     }
 
@@ -322,17 +323,50 @@ export class GroupService {
       throw new NotFoundError('Group not found');
     }
 
+    // Convert emails to user IDs if needed
+    const userIds: string[] = [];
+    const emailsToConvert: string[] = [];
+
+    for (const identifier of data.userIds) {
+      if (identifier.includes('@')) {
+        // It's an email address
+        emailsToConvert.push(identifier);
+      } else {
+        // It's already a user ID
+        userIds.push(identifier);
+      }
+    }
+
+    // Convert emails to user IDs
+    if (emailsToConvert.length > 0) {
+      const users = await prisma.user.findMany({
+        where: {
+          email: { in: emailsToConvert }
+        },
+        select: { id: true, email: true }
+      });
+
+      const foundEmails = new Set(users.map(u => u.email));
+      const notFoundEmails = emailsToConvert.filter(email => !foundEmails.has(email));
+
+      if (notFoundEmails.length > 0) {
+        throw new ValidationError(`Users not found: ${notFoundEmails.join(', ')}`);
+      }
+
+      userIds.push(...users.map(u => u.id));
+    }
+
     // Verify all users are organization members
     const orgMembers = await prisma.organizationMembership.findMany({
       where: {
         organizationId,
-        userId: { in: data.userIds }
+        userId: { in: userIds }
       },
       select: { userId: true }
     });
 
     const orgMemberIds = new Set(orgMembers.map((m: any) => m.userId));
-    const invalidUserIds = data.userIds.filter(id => !orgMemberIds.has(id));
+    const invalidUserIds = userIds.filter(id => !orgMemberIds.has(id));
 
     if (invalidUserIds.length > 0) {
       throw new ValidationError('Some users are not members of this organization');
@@ -341,13 +375,13 @@ export class GroupService {
     const existingMemberships = await prisma.groupMembership.findMany({
       where: {
         groupId,
-        userId: { in: data.userIds }
+        userId: { in: userIds }
       },
       select: { userId: true }
     });
 
     const existingMemberIds = new Set(existingMemberships.map((m: any) => m.userId));
-    const newUserIds = data.userIds.filter(id => !existingMemberIds.has(id));
+    const newUserIds = userIds.filter(id => !existingMemberIds.has(id));
 
     if (newUserIds.length === 0) {
       throw new ValidationError('All specified users are already members of this group');
@@ -376,7 +410,8 @@ export class GroupService {
     targetUserId: string
   ) {
     const permissions = await permissionService.getUserPermissions(userId, organizationId);
-    if (!permissions.canManageUsers) {
+    if (!permissions.canManageUsers && !permissions.isAdmin) {
+      console.log('permissions', permissions)
       throw new PermissionError('Insufficient permissions to manage group members');
     }
 
@@ -418,7 +453,7 @@ export class GroupService {
   ) {
 
     const userPermissions = await permissionService.getUserPermissions(userId, organizationId);
-    if (!userPermissions.canManageUsers) {
+    if (!userPermissions.canManageUsers && !userPermissions.isAdmin) {
       throw new PermissionError('Insufficient permissions to manage group member permissions');
     }
 

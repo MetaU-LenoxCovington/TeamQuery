@@ -346,7 +346,7 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
             </div>
           )}
         </div>
-
+        {/*
         <div className="p-4 border-t" style={{ borderColor: COLORS.lavender }}>
           <h3>Recent Conversations</h3>
           <p>Chat history coming soon</p>
@@ -358,6 +358,7 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
             Clear Chat
           </button>
         </div>
+        */}
       </div>
     </div>
   );

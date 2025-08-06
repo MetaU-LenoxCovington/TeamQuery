@@ -63,6 +63,28 @@ export interface GroupMembersResponse {
   data: GroupMember[];
 }
 
+export interface GroupRecommendation {
+  group_id: string;
+  group_name: string;
+  score: number;
+  reason: string;
+  details: {
+    buddies_in_group: string[];
+    denials_that_would_be_resolved: number;
+    score_breakdown: Record<string, number>;
+  };
+}
+
+export interface UserGroupRecommendationsResponse {
+  success: boolean;
+  data: {
+    user_id: string;
+    organization_id: string;
+    recommendations: GroupRecommendation[];
+    processing_time: number;
+  };
+}
+
 class GroupService {
   async getGroups(organizationId: string): Promise<Group[]> {
     const response = await apiClient.get<GroupListResponse>(
@@ -125,6 +147,13 @@ class GroupService {
       `/api/organizations/${organizationId}/groups/${groupId}/members/${memberId}/permissions`,
       permissions
     );
+  }
+
+  async getUserGroupRecommendations(organizationId: string, userId: string, topK: number = 3): Promise<GroupRecommendation[]> {
+    const response = await apiClient.get<UserGroupRecommendationsResponse>(
+      `/api/rag/users/${userId}/group-recommendations?organizationId=${organizationId}&topK=${topK}`
+    );
+    return response.data.recommendations;
   }
 }
 

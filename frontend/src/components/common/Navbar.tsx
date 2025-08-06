@@ -28,9 +28,6 @@ export const Navbar: React.FC<NavbarProps> = ({ currentPage }) => {
           <Link href="/chat" className={currentPage === 'chat' ? 'font-bold' : 'text-blue-600'}>
             Chat
           </Link>
-          <Link href="/dashboard" className={currentPage === 'dashboard' ? 'font-bold' : 'text-blue-600'}>
-            Dashboard
-          </Link>
           <Link href="/dashboard/documents" className={currentPage === 'documents' ? 'font-bold' : 'text-blue-600'}>
             Documents
           </Link>

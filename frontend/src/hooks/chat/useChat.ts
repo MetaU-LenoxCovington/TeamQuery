@@ -54,8 +54,22 @@ export const useChat = (): UseChatReturn => {
     setError(null);
 
     try {
+      // Format conversation history as a single string for the LLM
+      let formattedQuery = content;
+      
+      if (messages.length > 0) {
+        const conversationContext = messages
+          .map(msg => {
+            const role = msg.type === 'user' ? 'Human' : 'Assistant';
+            return `${role}: ${msg.content}`;
+          })
+          .join('\n\n');
+        
+        formattedQuery = `Previous conversation context:\n${conversationContext}\n\nCurrent query: ${content}`;
+      }
+
       const aiMessage = await chatService.sendMessage({
-        content,
+        content: formattedQuery,
         organizationId: currentOrganization.id
       });
 
@@ -70,7 +84,7 @@ export const useChat = (): UseChatReturn => {
     } finally {
       setIsLoading(false);
     }
-  }, [currentOrganization]);
+  }, [currentOrganization, messages]);
 
   const clearError = useCallback(() => {
     setError(null);

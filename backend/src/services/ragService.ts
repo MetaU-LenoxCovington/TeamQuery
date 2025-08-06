@@ -110,4 +110,48 @@ export class RagService {
       throw error;
     }
   }
+
+  async getUserGroupRecommendations(
+    requestingUserId: string,
+    targetUserId: string,
+    organizationId: string,
+    topK: number = 3
+  ): Promise<any> {
+    try {
+      logger.info(`Getting group recommendations for user ${targetUserId} in organization ${organizationId}`);
+
+      const permissions = await this.permissionService.getUserPermissions(requestingUserId, organizationId);
+      if (!permissions.canManageUsers && !permissions.isAdmin) {
+        throw new PermissionError('Insufficient permissions to view group recommendations');
+      }
+
+      const requestBody = {
+        user_id: targetUserId,
+        organization_id: organizationId,
+        top_k: topK
+      };
+
+      const response = await fetch(`${this.pythonServiceUrl}/api/search/users/${targetUserId}/group-recommendations`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestBody)
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Python service group recommendations failed: ${response.status}: ${errorText}`);
+      }
+
+      const result = await response.json();
+      logger.info(`Generated ${result.recommendations?.length || 0} group recommendations for user ${targetUserId}`);
+
+      return result;
+
+    } catch (error: any) {
+      logger.error(`Group recommendations failed for user ${targetUserId} in organization ${organizationId}:`, error);
+      throw error;
+    }
+  }
 }
